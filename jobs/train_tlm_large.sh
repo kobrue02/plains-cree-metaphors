@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=08:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
@@ -41,7 +41,7 @@ python3 main.py \
     --sentences-file data/sentences.txt \
     --model-name xlm-roberta-large \
     --epochs 10 \
-    --batch-size 16 \
+    --batch-size 32 \
     --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm \
     --wandb-project fnlp-tlm
 

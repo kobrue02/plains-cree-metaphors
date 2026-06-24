@@ -5,7 +5,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=06:00:00
+#SBATCH --time=00:30:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
@@ -41,8 +41,8 @@ python3 main.py \
     --metaphor \
     --experiment tlm_layer_12 \
     --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --batch-size 16 \
-    --epochs 5 \
+    --batch-size 32 \
+    --epochs 10 \
     --wandb-project fnlp-metaphor
 
 if [ $? -eq 0 ]; then
