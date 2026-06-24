@@ -35,7 +35,12 @@ mkdir -p logs
 
 # 4. Train — final hidden layer
 echo "=== Variant 1: TLM encoder, final hidden layer ==="
-python3 experiments/run_metaphor.py train --experiment tlm_last_layer --batch_size 32
+python3 main.py \
+    --metaphor \
+    --experiment tlm_last_layer \
+    --batch-size 32 \
+    --epochs 5 \
+    --wandb-project fnlp-metaphor
 
 if [ $? -ne 0 ]; then
     echo "Variant 1 failed. Aborting."
@@ -44,7 +49,12 @@ fi
 
 # 5. Train — hidden_states[12]
 echo "=== Variant 2: TLM encoder, hidden_states[12] ==="
-python3 experiments/run_metaphor.py train --experiment tlm_layer_12 --batch_size 32
+python3 main.py \
+    --metaphor \
+    --experiment tlm_layer_12 \
+    --batch-size 32 \
+    --epochs 5 \
+    --wandb-project fnlp-metaphor
 
 if [ $? -ne 0 ]; then
     echo "Variant 2 failed."

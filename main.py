@@ -8,6 +8,17 @@ from src.scrapers import BloomfieldScraper
 from src.eda import EDA
 from src.annotate import call_deepseek, format_prompt
 from src.mt import TLMFinetuner, TLMConfig, ParallelSentenceSplitter
+from src.metaphor import config as metaphor_config
+from src.metaphor.train import train as metaphor_train_fn
+
+METAPHOR_PRESETS = {
+    "baseline":              metaphor_config.baseline,
+    "tlm_last_layer":        metaphor_config.tlm_last_layer,
+    "tlm_layer_12":          metaphor_config.tlm_layer_12,
+    "awesome_align":         metaphor_config.awesome_align_encoder,
+    "content_words":         metaphor_config.content_words_only,
+    "awesome_align_content": metaphor_config.awesome_align_content_words,
+}
 
 
 # ── pipeline steps ────────────────────────────────────────────────────────────
@@ -82,6 +93,26 @@ def fine_tune(
     return ckpt
 
 
+def metaphor_train(
+    experiment:    str        = "tlm_last_layer",
+    epochs:        int | None = None,
+    batch_size:    int | None = None,
+    learning_rate: float | None = None,
+    hub_model_id:  str | None = None,
+    wandb_project: str | None = None,
+) -> str:
+    preset_fn = METAPHOR_PRESETS.get(experiment)
+    if preset_fn is None:
+        raise ValueError(f"Unknown experiment '{experiment}'. Choose from: {list(METAPHOR_PRESETS)}")
+    cfg = preset_fn()
+    if epochs        is not None: cfg.epochs        = epochs
+    if batch_size    is not None: cfg.batch_size     = batch_size
+    if learning_rate is not None: cfg.learning_rate  = learning_rate
+    if hub_model_id  is not None: cfg.hub_model_id   = hub_model_id
+    if wandb_project is not None: cfg.wandb_project  = wandb_project
+    return metaphor_train_fn(cfg)
+
+
 def split_sentences(output: str, confidence: float = 0.0) -> None:
     df = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
     ParallelSentenceSplitter(df).write(output, min_confidence=confidence)
@@ -113,6 +144,8 @@ examples:
                         help="Split paragraphs into sentence pairs and write src ||| tgt")
     parser.add_argument("--fine-tune",       action="store_true",
                         help="TLM fine-tune XLM-R on Cree-English sentence pairs")
+    parser.add_argument("--metaphor",        action="store_true",
+                        help="Fine-tune a metaphor detector on VUA20")
     parser.add_argument("--output",          default="data/sentences.txt",
                         help="Output path for --split-sentences (default: data/sentences.txt)")
     parser.add_argument("--confidence",      type=float, default=0.0,
@@ -125,13 +158,18 @@ examples:
                         help="Per-device train batch size (default: 16)")
     parser.add_argument("--hub-model-id",   default=None,
                         help="HuggingFace Hub repo ID to push the final model to (e.g. YourName/model-tag)")
-    parser.add_argument("--wandb-project",  default=None,
+    parser.add_argument("--wandb-project",   default=None,
                         help="Weights & Biases project name for logging (omit to disable)")
+    parser.add_argument("--experiment",      default="tlm_last_layer",
+                        choices=list(METAPHOR_PRESETS),
+                        help="Metaphor experiment preset (default: tlm_last_layer)")
+    parser.add_argument("--learning-rate",   type=float, default=None,
+                        help="Learning rate override for --metaphor (default: preset value)")
 
     args = parser.parse_args()
 
     if not any([args.scrape, args.eda, args.annotate,
-                args.split_sentences, args.fine_tune]):
+                args.split_sentences, args.fine_tune, args.metaphor]):
         parser.print_help()
         return
 
@@ -149,6 +187,17 @@ examples:
 
     if args.fine_tune:
         ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project)
+        print(f"Checkpoint: {ckpt}")
+
+    if args.metaphor:
+        ckpt = metaphor_train(
+            experiment    = args.experiment,
+            epochs        = args.epochs,
+            batch_size    = args.batch_size,
+            learning_rate = args.learning_rate,
+            hub_model_id  = args.hub_model_id,
+            wandb_project = args.wandb_project,
+        )
         print(f"Checkpoint: {ckpt}")
 
 
