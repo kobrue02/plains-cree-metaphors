@@ -64,9 +64,7 @@ class XLMRobertaLayerSelectForTokenClassification(XLMRobertaPreTrainedModel):
             loss_fct = nn.CrossEntropyLoss(ignore_index=-100)
             loss = loss_fct(logits.view(-1, self.num_labels), labels.view(-1))
 
-        return TokenClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions,
-        )
+        # Don't propagate hidden_states/attentions — the Trainer accumulates all
+        # output fields during eval, and returning 25 hidden-state tensors of
+        # varying shapes causes an inhomogeneous-array crash in compute_metrics.
+        return TokenClassifierOutput(loss=loss, logits=logits)
