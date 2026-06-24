@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=TLM_Cree_EN
+#SBATCH --job-name=Metaphor_Base_Last
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -11,8 +11,7 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Fine-tune XLM-R on Cree-English pairs via Translation Language Modeling (TLM).
-# Single A100 GPU, no accelerate.
+# Fine-tune TLM-adapted XLM-R base on VUA20, using the final hidden layer.
 
 # 1. Load Modules
 module load devel/cuda/12.8
@@ -31,21 +30,20 @@ PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
 source $PROJECT_ROOT/.venv/bin/activate
 cd $PROJECT_ROOT
 uv sync
-mkdir -p logs data/tlm_model
+mkdir -p logs
 
-# 4. Execute TLM Fine-tuning
-echo "Starting TLM fine-tuning on 1 x A100..."
+# 4. Train
+echo "Starting metaphor fine-tuning (XLM-R base, final layer)..."
 
 python3 main.py \
-    --fine-tune \
-    --sentences-file data/sentences.txt \
-    --epochs 10 \
+    --metaphor \
+    --experiment tlm_last_layer \
     --batch-size 32 \
-    --hub-model-id KonradBRG/xlm-r-plains-cree-en-tlm \
-    --wandb-project fnlp-tlm
+    --epochs 5 \
+    --wandb-project fnlp-metaphor
 
 if [ $? -eq 0 ]; then
-    echo "TLM fine-tuning completed successfully."
+    echo "Training completed successfully."
 else
-    echo "TLM fine-tuning failed with exit code $?."
+    echo "Training failed with exit code $?."
 fi

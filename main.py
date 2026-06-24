@@ -72,6 +72,7 @@ def fine_tune(
     batch_size:     int  = 16,
     hub_model_id:   str | None = None,
     wandb_project:  str | None = None,
+    model_name:     str  = "xlm-roberta-base",
 ) -> str:
     if sentences_file:
         sent_df = pd.read_csv(
@@ -88,28 +89,30 @@ def fine_tune(
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
-    cfg  = TLMConfig(epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
+    cfg  = TLMConfig(model_name=model_name, epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
     ckpt = TLMFinetuner(cfg).fit(sent_df)
     return ckpt
 
 
 def metaphor_train(
-    experiment:    str        = "tlm_last_layer",
-    epochs:        int | None = None,
-    batch_size:    int | None = None,
+    experiment:    str         = "tlm_last_layer",
+    epochs:        int | None  = None,
+    batch_size:    int | None  = None,
     learning_rate: float | None = None,
-    hub_model_id:  str | None = None,
-    wandb_project: str | None = None,
+    hub_model_id:  str | None  = None,
+    wandb_project: str | None  = None,
+    encoder:       str | None  = None,
 ) -> str:
     preset_fn = METAPHOR_PRESETS.get(experiment)
     if preset_fn is None:
         raise ValueError(f"Unknown experiment '{experiment}'. Choose from: {list(METAPHOR_PRESETS)}")
     cfg = preset_fn()
-    if epochs        is not None: cfg.epochs        = epochs
-    if batch_size    is not None: cfg.batch_size     = batch_size
-    if learning_rate is not None: cfg.learning_rate  = learning_rate
-    if hub_model_id  is not None: cfg.hub_model_id   = hub_model_id
-    if wandb_project is not None: cfg.wandb_project  = wandb_project
+    if encoder       is not None: cfg.encoder        = encoder
+    if epochs        is not None: cfg.epochs         = epochs
+    if batch_size    is not None: cfg.batch_size      = batch_size
+    if learning_rate is not None: cfg.learning_rate   = learning_rate
+    if hub_model_id  is not None: cfg.hub_model_id    = hub_model_id
+    if wandb_project is not None: cfg.wandb_project   = wandb_project
     return metaphor_train_fn(cfg)
 
 
@@ -165,6 +168,10 @@ examples:
                         help="Metaphor experiment preset (default: tlm_last_layer)")
     parser.add_argument("--learning-rate",   type=float, default=None,
                         help="Learning rate override for --metaphor (default: preset value)")
+    parser.add_argument("--encoder",         default=None,
+                        help="Encoder checkpoint for --metaphor, overrides the preset (e.g. KonradBRG/xlm-r-large-plains-cree-en-tlm)")
+    parser.add_argument("--model-name",      default="xlm-roberta-base",
+                        help="Base model for --fine-tune (default: xlm-roberta-base)")
 
     args = parser.parse_args()
 
@@ -186,7 +193,7 @@ examples:
         split_sentences(args.output, args.confidence)
 
     if args.fine_tune:
-        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project)
+        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project, args.model_name)
         print(f"Checkpoint: {ckpt}")
 
     if args.metaphor:
@@ -197,6 +204,7 @@ examples:
             learning_rate = args.learning_rate,
             hub_model_id  = args.hub_model_id,
             wandb_project = args.wandb_project,
+            encoder       = args.encoder,
         )
         print(f"Checkpoint: {ckpt}")
 
