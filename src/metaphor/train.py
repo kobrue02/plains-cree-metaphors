@@ -97,6 +97,8 @@ def train(config: ExperimentConfig) -> str:
         greater_is_better=True,
         logging_steps=100,
         report_to="wandb" if config.wandb_project else "none",
+        gradient_checkpointing=True,
+        eval_accumulation_steps=8,   # flush eval logits to CPU every 8 steps — prevents OOM on large models
         **get_precision_kwargs(),
         **({"push_to_hub": True, "hub_model_id": config.hub_model_id} if config.hub_model_id else {}),
     )
