@@ -31,7 +31,7 @@ PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
 source $PROJECT_ROOT/.venv/bin/activate
 cd $PROJECT_ROOT
 uv sync
-mkdir -p logs data/tlm_model_large
+mkdir -p logs
 
 # 4. Execute TLM Fine-tuning (large)
 echo "Starting TLM fine-tuning (xlm-roberta-large) on 1 x A100..."
@@ -42,6 +42,7 @@ python3 main.py \
     --model-name xlm-roberta-large \
     --epochs 10 \
     --batch-size 32 \
+    --tlm-output-dir data/tlm_model_large \
     --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm \
     --wandb-project fnlp-tlm
 

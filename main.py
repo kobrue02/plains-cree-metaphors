@@ -73,6 +73,7 @@ def fine_tune(
     hub_model_id:   str | None = None,
     wandb_project:  str | None = None,
     model_name:     str  = "xlm-roberta-base",
+    output_dir:     str  = "data/tlm_model",
 ) -> str:
     if sentences_file:
         sent_df = pd.read_csv(
@@ -89,7 +90,7 @@ def fine_tune(
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
-    cfg  = TLMConfig(model_name=model_name, epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
+    cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
     ckpt = TLMFinetuner(cfg).fit(sent_df)
     return ckpt
 
@@ -172,6 +173,8 @@ examples:
                         help="Encoder checkpoint for --metaphor, overrides the preset (e.g. KonradBRG/xlm-r-large-plains-cree-en-tlm)")
     parser.add_argument("--model-name",      default="xlm-roberta-base",
                         help="Base model for --fine-tune (default: xlm-roberta-base)")
+    parser.add_argument("--tlm-output-dir", default="data/tlm_model",
+                        help="Output directory for --fine-tune (default: data/tlm_model)")
 
     args = parser.parse_args()
 
@@ -193,7 +196,7 @@ examples:
         split_sentences(args.output, args.confidence)
 
     if args.fine_tune:
-        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project, args.model_name)
+        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project, args.model_name, args.tlm_output_dir)
         print(f"Checkpoint: {ckpt}")
 
     if args.metaphor:
