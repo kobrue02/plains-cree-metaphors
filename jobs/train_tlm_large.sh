@@ -41,7 +41,7 @@ python3 main.py \
     --sentences-file data/sentences.txt \
     --model-name xlm-roberta-large \
     --epochs 10 \
-    --batch-size 32 \
+    --batch-size 16 \
     --tlm-output-dir data/tlm_model_large \
     --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm \
     --wandb-project fnlp-tlm
