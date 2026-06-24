@@ -54,13 +54,31 @@ def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
     return df
 
 
-def fine_tune(confidence: float = 0.0) -> str:
-    df       = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
-    sent_df  = ParallelSentenceSplitter(df).split()
-    if confidence > 0:
-        sent_df = sent_df[sent_df.confidence >= confidence]
-        print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
-    ckpt = TLMFinetuner(TLMConfig(epochs=5)).fit(sent_df)
+def fine_tune(
+    confidence:     float = 0.0,
+    sentences_file: str | None = None,
+    epochs:         int  = 5,
+    batch_size:     int  = 16,
+    hub_model_id:   str | None = None,
+    wandb_project:  str | None = None,
+) -> str:
+    if sentences_file:
+        sent_df = pd.read_csv(
+            sentences_file,
+            sep=r"\s*\|\|\|\s*",
+            header=None,
+            names=["text_cree", "text_en"],
+            engine="python",
+        )
+        print(f"Loaded {len(sent_df):,} pairs from {sentences_file}")
+    else:
+        df      = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
+        sent_df = ParallelSentenceSplitter(df).split()
+        if confidence > 0:
+            sent_df = sent_df[sent_df.confidence >= confidence]
+            print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
+    cfg  = TLMConfig(epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
+    ckpt = TLMFinetuner(cfg).fit(sent_df)
     return ckpt
 
 
@@ -99,6 +117,16 @@ examples:
                         help="Output path for --split-sentences (default: data/sentences.txt)")
     parser.add_argument("--confidence",      type=float, default=0.0,
                         help="Minimum alignment confidence filter for sentence pairs (0–1)")
+    parser.add_argument("--sentences-file", default=None,
+                        help="Pre-split sentences file (cree ||| en) to use instead of the scraper pipeline")
+    parser.add_argument("--epochs",         type=int,   default=5,
+                        help="Number of TLM training epochs (default: 5)")
+    parser.add_argument("--batch-size",     type=int,   default=16,
+                        help="Per-device train batch size (default: 16)")
+    parser.add_argument("--hub-model-id",   default=None,
+                        help="HuggingFace Hub repo ID to push the final model to (e.g. YourName/model-tag)")
+    parser.add_argument("--wandb-project",  default=None,
+                        help="Weights & Biases project name for logging (omit to disable)")
 
     args = parser.parse_args()
 
@@ -120,7 +148,7 @@ examples:
         split_sentences(args.output, args.confidence)
 
     if args.fine_tune:
-        ckpt = fine_tune(args.confidence)
+        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project)
         print(f"Checkpoint: {ckpt}")
 
 

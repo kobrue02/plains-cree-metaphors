@@ -41,6 +41,8 @@ class TLMConfig:
     weight_decay:    float = 0.01
     dev_ratio:       float = 0.05
     seed:            int   = 42
+    hub_model_id:    str | None = None
+    wandb_project:   str | None = None  # e.g. "fnlp-tlm"; set to None to disable
 
 
 class TLMDataset(Dataset):
@@ -151,6 +153,8 @@ class TLMFinetuner:
 
         tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
         model     = AutoModelForMaskedLM.from_pretrained(cfg.model_name)
+        if not getattr(model.config, "model_type", None):
+            model.config.model_type = cfg.model_name.split("/")[-1].split("-")[0]
 
         train_ds = TLMDataset(train_pairs, tokenizer, cfg.max_length)
         dev_ds   = TLMDataset(dev_pairs,   tokenizer, cfg.max_length)
@@ -159,6 +163,14 @@ class TLMFinetuner:
             tokenizer=tokenizer,
             mlm=True,
             mlm_probability=cfg.mlm_probability,
+        )
+
+        if cfg.wandb_project:
+            os.environ["WANDB_PROJECT"] = cfg.wandb_project
+
+        hub_kwargs = (
+            {"push_to_hub": True, "hub_model_id": cfg.hub_model_id}
+            if cfg.hub_model_id else {}
         )
 
         args = TrainingArguments(
@@ -176,9 +188,10 @@ class TLMFinetuner:
             metric_for_best_model="eval_loss",
             greater_is_better=False,
             logging_steps=50,
-            report_to="none",
+            report_to="wandb" if cfg.wandb_project else "none",
             **get_precision_kwargs(),
             seed=cfg.seed,
+            **hub_kwargs,
         )
 
         trainer = Trainer(
@@ -192,6 +205,10 @@ class TLMFinetuner:
         trainer.train()
         trainer.save_model(cfg.output_dir)
         tokenizer.save_pretrained(cfg.output_dir)
-
         print(f"[TLM] saved to {cfg.output_dir}")
+
+        if cfg.hub_model_id:
+            trainer.push_to_hub()
+            print(f"[TLM] pushed to hub: {cfg.hub_model_id}")
+
         return cfg.output_dir
