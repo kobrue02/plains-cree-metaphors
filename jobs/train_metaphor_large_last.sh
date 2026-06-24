@@ -40,7 +40,7 @@ python3 main.py \
     --metaphor \
     --experiment tlm_last_layer \
     --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-metaphor-last \
+    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-metaphor \
     --batch-size 32 \
     --epochs 10 \
     --wandb-project fnlp-metaphor

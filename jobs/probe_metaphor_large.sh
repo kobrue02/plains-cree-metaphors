@@ -40,7 +40,7 @@ python3 main.py \
     --metaphor \
     --experiment tlm_last_layer \
     --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-probe-last \
+    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-probe \
     --freeze-encoder \
     --batch-size 32 \
     --epochs 10 \
@@ -57,7 +57,7 @@ python3 main.py \
     --metaphor \
     --experiment tlm_layer_12 \
     --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-probe-layer12 \
+    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-probe-l12 \
     --freeze-encoder \
     --batch-size 32 \
     --epochs 10 \

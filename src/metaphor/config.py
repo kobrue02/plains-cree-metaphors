@@ -118,7 +118,7 @@ def tlm_last_layer() -> ExperimentConfig:
         hidden_layer=None,
         experiment_name="tlm_last_layer",
         wandb_project="fnlp-metaphor",
-        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor-last",
+        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor",
     )
 
 
@@ -134,5 +134,5 @@ def tlm_layer_12() -> ExperimentConfig:
         hidden_layer=12,
         experiment_name="tlm_layer_12",
         wandb_project="fnlp-metaphor",
-        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor-layer12",
+        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor",
     )
