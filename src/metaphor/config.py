@@ -45,6 +45,9 @@ class ExperimentConfig:
     # Batch size used during predict() — can be larger than train batch_size.
     infer_batch_size: int = 32
 
+    # ── Encoder training ──────────────────────────────────────────────────────
+    freeze_encoder: bool = False    # True = probe only (classifier head trains, encoder frozen)
+
     # ── Encoder hidden-layer selection ────────────────────────────────────────
     # None  → use last_hidden_state (standard).
     # int n → use hidden_states[n] (e.g. 12 for the 12th transformer layer).

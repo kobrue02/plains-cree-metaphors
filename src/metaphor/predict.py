@@ -22,6 +22,7 @@ class TokenPrediction:
     word: str
     label: int           # 0 = literal, 1 = metaphor
     confidence: float    # probability of the predicted class
+    metaphor_prob: float # raw P(metaphor) — useful for threshold tuning
 
 
 def load_model(
@@ -101,19 +102,21 @@ def predict(
                 seen_words.add(wid)
                 if wid >= len(words):
                     continue
-                p       = probs[b_idx, tok_idx]
-                label   = int(p.argmax().item())
-                conf    = float(p[label].item())
+                p             = probs[b_idx, tok_idx]
+                label         = int(p.argmax().item())
+                conf          = float(p[label].item())
+                metaphor_prob = float(p[1].item())
                 sent_preds.append(TokenPrediction(
                     word=words[wid],
                     label=label,
                     confidence=conf,
+                    metaphor_prob=metaphor_prob,
                 ))
 
             # Pad truncated sentences so len(sent_preds) == len(words) always.
             # Without this, truncated sentences shift all subsequent slices.
             for wid in range(len(sent_preds), len(words)):
-                sent_preds.append(TokenPrediction(word=words[wid], label=0, confidence=0.5))
+                sent_preds.append(TokenPrediction(word=words[wid], label=0, confidence=0.5, metaphor_prob=0.0))
 
             results.append(sent_preds)
 
@@ -136,9 +139,10 @@ def predict_df(
     for sent_idx, sent_preds in enumerate(predictions):
         for tp in sent_preds:
             rows.append({
-                "sentence_idx": sent_idx,
-                "word":         tp.word,
-                "label":        tp.label,
-                "confidence":   round(tp.confidence, 4),
+                "sentence_idx":  sent_idx,
+                "word":          tp.word,
+                "label":         tp.label,
+                "confidence":    round(tp.confidence, 4),
+                "metaphor_prob": round(tp.metaphor_prob, 4),
             })
     return pd.DataFrame(rows)

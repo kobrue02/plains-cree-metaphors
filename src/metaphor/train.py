@@ -76,6 +76,12 @@ def train(config: ExperimentConfig) -> str:
             ignore_mismatched_sizes=True,   # classification head is always reinitialised
         )
 
+    if config.freeze_encoder:
+        for param in model.base_model.parameters():
+            param.requires_grad = False
+        n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"[train] encoder frozen — trainable params: {n_trainable:,}")
+
     train_ds, eval_ds = build_datasets(tokenizer, config)
     weights = class_weights_from(train_ds) if config.class_weights else None
     if weights is not None:
@@ -97,7 +103,7 @@ def train(config: ExperimentConfig) -> str:
         greater_is_better=True,
         logging_steps=100,
         report_to="wandb" if config.wandb_project else "none",
-        gradient_checkpointing=True,
+        gradient_checkpointing=not config.freeze_encoder,
         eval_accumulation_steps=8,   # flush eval logits to CPU every 8 steps — prevents OOM on large models
         **get_precision_kwargs(),
         **({"push_to_hub": True, "hub_model_id": config.hub_model_id} if config.hub_model_id else {}),

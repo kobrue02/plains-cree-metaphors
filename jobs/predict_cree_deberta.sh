@@ -1,19 +1,19 @@
 #!/bin/bash
-#SBATCH --job-name=Metaphor_Large_L12
+#SBATCH --job-name=Predict_Cree_DeBERTa
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Fine-tune TLM-adapted XLM-R large on VUA20, using hidden_states[12].
-# For large (24 transformer layers) layer 12 is the genuine mid-network layer.
-# Requires KonradBRG/xlm-r-large-plains-cree-en-tlm to exist on the Hub first.
+# Zero-shot metaphor detection on Plains Cree using an English DeBERTa model
+# trained on VUA20 (tommyleo2077/deberta-v3-large-metaphor).
+# No Cree-specific fine-tuning — pure cross-lingual transfer baseline.
 
 # 1. Load Modules
 module load devel/cuda/12.8
@@ -34,19 +34,28 @@ cd $PROJECT_ROOT
 uv sync
 mkdir -p logs
 
-# 4. Train
-echo "Starting metaphor fine-tuning (XLM-R large, hidden_states[12])..."
+# 4. Predict
+echo "Running DeBERTa zero-shot on Cree sentences..."
 
 python3 main.py \
-    --metaphor \
-    --experiment tlm_layer_12 \
-    --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --batch-size 32 \
-    --epochs 10 \
-    --wandb-project fnlp-metaphor
+    --predict-cree \
+    --checkpoint tommyleo2077/deberta-v3-large-metaphor \
+    --predict-output data/bloomfield_metaphors_deberta.csv
+
+if [ $? -ne 0 ]; then
+    echo "Prediction failed."
+    exit 1
+fi
+
+# 5. Compare against annotations
+echo "Comparing against LLM annotations..."
+
+python3 main.py \
+    --compare \
+    --predict-output data/bloomfield_metaphors_deberta.csv
 
 if [ $? -eq 0 ]; then
-    echo "Training completed successfully."
+    echo "Done."
 else
-    echo "Training failed with exit code $?."
+    echo "Comparison failed with exit code $?."
 fi
