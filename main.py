@@ -315,13 +315,14 @@ def figurative_distill(
 def figurative_eval_idioms(
     checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
     idioms_file: str = "data/idioms.txt",
-    output_file: str | None = None,
 ) -> None:
+    slug = checkpoint.replace("/", "_").replace("\\", "_")
+    output_file = f"data/figurative/idiom_eval_{slug}.csv"
+    os.makedirs("data/figurative", exist_ok=True)
     model, tokenizer = figurative_load_model(checkpoint)
     result = eval_idioms(idioms_file, model, tokenizer)
-    if output_file:
-        result["detail"].to_csv(output_file, index=False, encoding="utf-8-sig")
-        print(f"Saved idiom evaluation to {output_file}")
+    result["detail"].to_csv(output_file, index=False, encoding="utf-8-sig")
+    print(f"Saved idiom evaluation to {output_file}")
 
 
 def predict_figurative(
@@ -556,7 +557,6 @@ examples:
         figurative_eval_idioms(
             checkpoint  = args.figurative_checkpoint,
             idioms_file = args.idioms_file,
-            output_file = args.figurative_output if args.figurative_output != "data/bloomfield_figurative.csv" else None,
         )
 
 
