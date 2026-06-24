@@ -47,6 +47,8 @@ from src.metaphor.config import (
     awesome_align_encoder,
     baseline,
     content_words_only,
+    tlm_last_layer,
+    tlm_layer_12,
 )
 from src.metaphor.train import train
 from src.metaphor.predict import load_model, predict_df
@@ -55,10 +57,12 @@ from src.metaphor.data import load_vua20_sentences
 
 
 PRESETS = {
-    "baseline":       baseline,
-    "awesome_align":  awesome_align_encoder,
-    "content_words":  content_words_only,
+    "baseline":              baseline,
+    "awesome_align":         awesome_align_encoder,
+    "content_words":         content_words_only,
     "awesome_align_content": awesome_align_content_words,
+    "tlm_last_layer":        tlm_last_layer,
+    "tlm_layer_12":          tlm_layer_12,
 }
 
 

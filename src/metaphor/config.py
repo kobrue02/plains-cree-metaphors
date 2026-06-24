@@ -45,6 +45,15 @@ class ExperimentConfig:
     # Batch size used during predict() — can be larger than train batch_size.
     infer_batch_size: int = 32
 
+    # ── Encoder hidden-layer selection ────────────────────────────────────────
+    # None  → use last_hidden_state (standard).
+    # int n → use hidden_states[n] (e.g. 12 for the 12th transformer layer).
+    hidden_layer: int | None = None
+
+    # ── Logging & Hub ─────────────────────────────────────────────────────────
+    wandb_project:  str | None = None   # e.g. "fnlp-metaphor"; None disables wandb
+    hub_model_id:   str | None = None   # e.g. "KonradBRG/model-name"; None skips push
+
     # ── Output ────────────────────────────────────────────────────────────────
     experiment_name: str = "base_xlmr"
     output_root: str = "data/metaphor"
@@ -96,4 +105,31 @@ def awesome_align_content_words() -> ExperimentConfig:
         encoder="data/awesome_align/model",
         content_words_only=True,
         experiment_name="awesome_align_content_only",
+    )
+
+
+def tlm_last_layer() -> ExperimentConfig:
+    """TLM-adapted XLM-R fine-tuned on VUA20, using the final hidden layer."""
+    return ExperimentConfig(
+        encoder="KonradBRG/xlm-r-plains-cree-en-tlm",
+        hidden_layer=None,
+        experiment_name="tlm_last_layer",
+        wandb_project="fnlp-metaphor",
+        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor-last",
+    )
+
+
+def tlm_layer_12() -> ExperimentConfig:
+    """TLM-adapted XLM-R fine-tuned on VUA20, using hidden_states[12].
+
+    For XLM-R base (12 transformer layers) this equals last_hidden_state.
+    For XLM-R large (24 layers) this is the mid-network layer that several
+    metaphor-detection papers find more effective.
+    """
+    return ExperimentConfig(
+        encoder="KonradBRG/xlm-r-plains-cree-en-tlm",
+        hidden_layer=12,
+        experiment_name="tlm_layer_12",
+        wandb_project="fnlp-metaphor",
+        hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-metaphor-layer12",
     )

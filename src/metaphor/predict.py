@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import torch
-from transformers import AutoModelForTokenClassification, AutoTokenizer
+from transformers import AutoConfig, AutoModelForTokenClassification, AutoTokenizer
 
 from src.metaphor.config import ExperimentConfig
+from src.metaphor.model import XLMRobertaLayerSelectForTokenClassification
 from src.device import get_device
 
 
@@ -35,8 +36,12 @@ def load_model(
         if isinstance(config_or_path, ExperimentConfig)
         else config_or_path
     )
-    tokenizer = AutoTokenizer.from_pretrained(path)
-    model     = AutoModelForTokenClassification.from_pretrained(path)
+    tokenizer   = AutoTokenizer.from_pretrained(path)
+    saved_cfg   = AutoConfig.from_pretrained(path)
+    if getattr(saved_cfg, "hidden_layer", None) is not None:
+        model = XLMRobertaLayerSelectForTokenClassification.from_pretrained(path)
+    else:
+        model = AutoModelForTokenClassification.from_pretrained(path)
     model.eval()
     return model, tokenizer
 
