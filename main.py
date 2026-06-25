@@ -24,6 +24,7 @@ from src.figurative.predict import (
 FIGURATIVE_PRESETS = {
     "tlm_base":  figurative_config.tlm_base,
     "tlm_large": figurative_config.tlm_large,
+    "tlm_xlm":   figurative_config.tlm_xlm,
     "baseline":  figurative_config.baseline,
 }
 

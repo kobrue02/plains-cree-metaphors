@@ -58,6 +58,18 @@ def tlm_large() -> FigurativeConfig:
     )
 
 
+def tlm_xlm() -> FigurativeConfig:
+    """XLM-MLM-100-1280 TLM-adapted encoder fine-tuned on VUA20+MAGPIE."""
+    return FigurativeConfig(
+        encoder="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm",
+        batch_size=16,
+        grad_accum=2,
+        experiment_name="tlm_xlm_figurative",
+        wandb_project="fnlp-figurative",
+        hub_model_id="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative",
+    )
+
+
 def baseline() -> FigurativeConfig:
     """Vanilla XLM-R base — control condition, no Cree-specific pre-training."""
     return FigurativeConfig(

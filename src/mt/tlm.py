@@ -68,11 +68,15 @@ class TLMDataset(Dataset):
                 truncation=True,
                 padding=False,
             )
-            # token_type_ids are all-zero for XLM-R; drop to avoid DataCollator confusion
-            self.examples.append({
+            example = {
                 "input_ids":      enc["input_ids"],
                 "attention_mask": enc["attention_mask"],
-            })
+            }
+            # XLM-R produces all-zero token_type_ids (useless); XLM uses them to
+            # distinguish the two language segments, so keep them when present.
+            if enc.get("token_type_ids") and any(enc["token_type_ids"]):
+                example["token_type_ids"] = enc["token_type_ids"]
+            self.examples.append(example)
 
     def __len__(self) -> int:
         return len(self.examples)
