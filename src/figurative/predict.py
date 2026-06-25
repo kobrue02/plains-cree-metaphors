@@ -14,8 +14,11 @@ from src.figurative.data import LABEL_NAMES
 def load_model(
     checkpoint: str,
 ) -> tuple[AutoModelForSequenceClassification, AutoTokenizer]:
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint)
-    model = AutoModelForSequenceClassification.from_pretrained(checkpoint)
+    use_fast = "deberta-v3" not in checkpoint.lower()
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=use_fast)
+    model = AutoModelForSequenceClassification.from_pretrained(
+        checkpoint, torch_dtype=torch.float32,
+    )
     model.eval()
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
