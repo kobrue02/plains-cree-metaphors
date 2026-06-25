@@ -41,7 +41,7 @@ python3 main.py \
     --fine-tune \
     --sentences-file data/sentences.txt \
     --model-name FacebookAI/xlm-mlm-100-1280 \
-    --epochs 10 \
+    --epochs 15 \
     --batch-size 16 \
     --tlm-output-dir data/tlm_model_xlm \
     --hub-model-id KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm \
