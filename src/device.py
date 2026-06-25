@@ -15,10 +15,12 @@ def get_device() -> str:
 def get_precision_kwargs() -> dict:
     """Return fp16/bf16 kwargs for HuggingFace TrainingArguments.
 
-    CUDA  → fp16=True  (fast on all NVIDIA GPUs)
-    MPS   → fp16=False (MPS does not support fp16 training)
-    CPU   → fp16=False
+    A100/H100 → bf16=True  (native BF16, no gradient scaling needed)
+    Other CUDA → fp16=True  (requires FP32 model weights; fails on FP16 models)
+    MPS/CPU    → no mixed precision
     """
     if torch.cuda.is_available():
+        if torch.cuda.is_bf16_supported():
+            return {"fp16": False, "bf16": True}
         return {"fp16": True, "bf16": False}
     return {"fp16": False, "bf16": False}
