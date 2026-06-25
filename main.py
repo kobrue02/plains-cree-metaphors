@@ -22,10 +22,11 @@ from src.figurative.predict import (
 )
 
 FIGURATIVE_PRESETS = {
-    "tlm_base":  figurative_config.tlm_base,
-    "tlm_large": figurative_config.tlm_large,
-    "tlm_xlm":   figurative_config.tlm_xlm,
-    "baseline":  figurative_config.baseline,
+    "tlm_base":       figurative_config.tlm_base,
+    "tlm_large":      figurative_config.tlm_large,
+    "tlm_xlm":        figurative_config.tlm_xlm,
+    "deberta_teacher": figurative_config.deberta_teacher,
+    "baseline":       figurative_config.baseline,
 }
 
 METAPHOR_PRESETS = {
@@ -291,19 +292,23 @@ def figurative_train(
 
 
 def figurative_distill(
-    checkpoint:   str   = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
-    mode:         str   = "align",
-    corpus_file:  str   = "data/bloomfield_texts_sentences.csv",
-    epochs:       int   = 10,
-    batch_size:   int   = 16,
-    learning_rate: float = 5e-6,
-    temperature:  float = 2.0,
-    hub_model_id: str | None = None,
-    wandb_project: str | None = None,
-    output_dir:   str   = "data/figurative/distilled",
+    checkpoint:          str        = "KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm",
+    teacher_checkpoint:  str | None = None,
+    freeze_n_layers:     int        = 0,
+    mode:                str        = "clkd",
+    corpus_file:         str        = "data/bloomfield_texts_sentences.csv",
+    epochs:              int        = 10,
+    batch_size:          int        = 16,
+    learning_rate:       float      = 5e-6,
+    temperature:         float      = 2.0,
+    hub_model_id:        str | None = None,
+    wandb_project:       str | None = None,
+    output_dir:          str        = "data/figurative/distilled",
 ) -> str:
     cfg = DistillConfig(
         checkpoint=checkpoint,
+        teacher_checkpoint=teacher_checkpoint,
+        freeze_n_layers=freeze_n_layers,
         corpus_file=corpus_file,
         mode=mode,
         epochs=epochs,
@@ -477,14 +482,18 @@ examples:
     # Cross-lingual distillation
     parser.add_argument("--distill-figurative", action="store_true",
                         help="Cross-lingual adaptation of the figurative classifier on the parallel corpus")
-    parser.add_argument("--distill-mode", default="align", choices=["align", "binary_kl"],
-                        help="Distillation mode: 'align' (cosine CLS loss) or 'binary_kl' (figurative/literal KL)")
-    parser.add_argument("--distill-checkpoint", default="KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
-                        help="Figurative model to start distillation from")
+    parser.add_argument("--distill-mode", default="clkd", choices=["align", "binary_kl", "clkd"],
+                        help="Distillation mode: 'clkd' (separate teacher/student KD), 'align', or 'binary_kl'")
+    parser.add_argument("--distill-checkpoint", default="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm",
+                        help="Student model checkpoint (TLM base for clkd, figurative checkpoint for align/binary_kl)")
+    parser.add_argument("--distill-teacher", default=None,
+                        help="Frozen English teacher checkpoint for --distill-mode clkd")
+    parser.add_argument("--distill-freeze-layers", type=int, default=0,
+                        help="Freeze first N student layers during CLKD (0 = train all, 12 = preserve cross-lingual alignment)")
     parser.add_argument("--distill-output", default="data/figurative/distilled",
                         help="Output directory for distilled model")
     parser.add_argument("--distill-temperature", type=float, default=2.0,
-                        help="Teacher softening temperature for --distill-mode binary_kl (default: 2.0)")
+                        help="Softening temperature for KL divergence (default: 2.0)")
     # Idiom golden-set evaluation
     parser.add_argument("--eval-idioms", action="store_true",
                         help="Evaluate a figurative model on the Cree idiom golden test set (data/idioms.txt)")
@@ -561,16 +570,18 @@ examples:
 
     if args.distill_figurative:
         ckpt = figurative_distill(
-            checkpoint    = args.distill_checkpoint,
-            mode          = args.distill_mode,
-            corpus_file   = args.input_file,
-            epochs        = args.epochs,
-            batch_size    = args.batch_size,
-            learning_rate = args.learning_rate if args.learning_rate else 5e-6,
-            temperature   = args.distill_temperature,
-            hub_model_id  = args.hub_model_id,
-            wandb_project = args.wandb_project,
-            output_dir    = args.distill_output,
+            checkpoint         = args.distill_checkpoint,
+            teacher_checkpoint = args.distill_teacher,
+            freeze_n_layers    = args.distill_freeze_layers,
+            mode               = args.distill_mode,
+            corpus_file        = args.input_file,
+            epochs             = args.epochs,
+            batch_size         = args.batch_size,
+            learning_rate      = args.learning_rate if args.learning_rate else 5e-6,
+            temperature        = args.distill_temperature,
+            hub_model_id       = args.hub_model_id,
+            wandb_project      = args.wandb_project,
+            output_dir         = args.distill_output,
         )
         print(f"Distilled model saved to: {ckpt}")
 

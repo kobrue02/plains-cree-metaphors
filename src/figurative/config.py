@@ -72,6 +72,18 @@ def tlm_xlm() -> FigurativeConfig:
     )
 
 
+def deberta_teacher() -> FigurativeConfig:
+    """DeBERTa-v3-base fine-tuned on VUA20+MAGPIE+FLUTE — English-only teacher."""
+    return FigurativeConfig(
+        encoder="microsoft/deberta-v3-base",
+        batch_size=16,
+        grad_accum=2,
+        experiment_name="deberta_figurative",
+        wandb_project="fnlp-figurative",
+        hub_model_id="KonradBRG/deberta-v3-base-figurative",
+    )
+
+
 def baseline() -> FigurativeConfig:
     """Vanilla XLM-R base — control condition, no Cree-specific pre-training."""
     return FigurativeConfig(

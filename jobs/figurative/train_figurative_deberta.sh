@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Metaphor_Large_Last
+#SBATCH --job-name=Train_Figurative_DeBERTa
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -11,8 +11,9 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Fine-tune TLM-adapted XLM-R large on VUA20, using the final hidden layer.
-# Requires KonradBRG/xlm-r-large-plains-cree-en-tlm to exist on the Hub first.
+# English-only figurative language teacher: DeBERTa-v3-base fine-tuned on
+# VUA20 + MAGPIE + FLUTE.  This checkpoint is used as the frozen teacher
+# in the CLKD pipeline.
 
 # 1. Load Modules
 module load devel/cuda/12.8
@@ -34,19 +35,19 @@ uv sync
 mkdir -p logs
 
 # 4. Train
-echo "Starting metaphor fine-tuning (XLM-R large, final layer)..."
+echo "Starting figurative training (DeBERTa-v3-base)..."
 
 python3 main.py \
-    --metaphor \
-    --experiment tlm_last_layer \
-    --encoder KonradBRG/xlm-r-large-plains-cree-en-tlm \
-    --hub-model-id KonradBRG/xlm-r-large-plains-cree-en-tlm-metaphor \
-    --batch-size 32 \
+    --train-figurative \
+    --figurative-experiment deberta_teacher \
+    --batch-size 16 \
     --epochs 10 \
-    --wandb-project fnlp-metaphor
+    --hub-model-id KonradBRG/deberta-v3-base-figurative \
+    --wandb-project fnlp-figurative
 
 if [ $? -eq 0 ]; then
     echo "Training completed successfully."
 else
     echo "Training failed with exit code $?."
+    exit 1
 fi

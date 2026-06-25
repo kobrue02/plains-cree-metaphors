@@ -11,10 +11,10 @@ from bs4 import BeautifulSoup
 class DictionaryEntry:
     headword:    str
     syllabics:   str
-    word_class:  str          # e.g. "NA-2", "VAI-1"
-    pos_tags:    list[str]    # e.g. ["Naming word — like: asikan", "only one"]
-    definitions: list[str]   # plain-text definitions
-    sources:     list[str]   # cite abbreviations per definition, e.g. ["CW", "MD"]
+    word_class:  str 
+    pos_tags:    list[str]
+    definitions: list[str]
+    sources:     list[str]
 
 
 class ItwewinaClient:

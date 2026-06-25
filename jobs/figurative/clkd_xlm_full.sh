@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Distill_Fig_Align
+#SBATCH --job-name=CLKD_XLM_Full
 #SBATCH --partition=gpu_a100_short
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -11,10 +11,11 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Cross-lingual adaptation via representation alignment.
-# Minimises cosine distance between [CLS] of Cree and English parallel
-# sentences.  No label assumption — only the encoder updates.
-# Requires the figurative model to already exist on the Hub.
+# CLKD with all XLM layers trainable (final-layer representation).
+#
+# Teacher : KonradBRG/deberta-v3-base-figurative  (frozen, English)
+# Student : KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm (TLM warmup)
+# All 16 layers + classification head trained on Cree via KL distillation.
 
 # 1. Load Modules
 module load devel/cuda/12.8
@@ -35,29 +36,24 @@ cd $PROJECT_ROOT
 uv sync
 mkdir -p logs
 
-# 4. Distil
-echo "Running alignment distillation..."
+# 4. Run CLKD
+echo "Starting CLKD (XLM, all layers trainable)..."
 
 python3 main.py \
     --distill-figurative \
-    --distill-mode align \
-    --distill-checkpoint KonradBRG/xlm-r-plains-cree-en-tlm-figurative \
-    --distill-output data/figurative/distilled_align \
-    --batch-size 16 \
+    --distill-mode clkd \
+    --distill-checkpoint KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm \
+    --distill-teacher KonradBRG/deberta-v3-base-figurative \
+    --distill-freeze-layers 0 \
+    --distill-output data/figurative/clkd_full \
     --epochs 10 \
-    --hub-model-id KonradBRG/xlm-r-plains-cree-en-tlm-figurative-align \
+    --batch-size 16 \
+    --hub-model-id KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full \
     --wandb-project fnlp-figurative
 
-if [ $? -ne 0 ]; then
-    echo "Distillation failed."
+if [ $? -eq 0 ]; then
+    echo "CLKD (full) completed successfully."
+else
+    echo "CLKD (full) failed with exit code $?."
     exit 1
 fi
-
-# 5. Evaluate on idiom golden test set
-echo "Evaluating on Cree idiom golden set..."
-
-python3 main.py \
-    --eval-idioms \
-    --figurative-checkpoint data/figurative/distilled_align
-
-echo "Done."
