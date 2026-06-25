@@ -18,8 +18,9 @@ class FigurativeConfig:
     learning_rate: float = 2e-5
     warmup_ratio:  float = 0.06
     weight_decay:  float = 0.01
-    class_weights: bool  = True
-    freeze_encoder: bool = False
+    class_weights:        bool  = True
+    freeze_encoder:       bool  = False
+    gradient_checkpointing: bool = True
 
     # ── Logging & Hub ─────────────────────────────────────────────────────────
     wandb_project: str | None = None
@@ -64,6 +65,7 @@ def tlm_xlm() -> FigurativeConfig:
         encoder="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm",
         batch_size=16,
         grad_accum=2,
+        gradient_checkpointing=False,
         experiment_name="tlm_xlm_figurative",
         wandb_project="fnlp-figurative",
         hub_model_id="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative",

@@ -57,6 +57,7 @@ def train(config: FigurativeConfig) -> str:
         ignore_mismatched_sizes=True,
         id2label={i: l for i, l in enumerate(LABEL_NAMES)},
         label2id={l: i for i, l in enumerate(LABEL_NAMES)},
+        torch_dtype=torch.float32,
     )
 
     if config.freeze_encoder:
@@ -85,7 +86,7 @@ def train(config: FigurativeConfig) -> str:
         greater_is_better=True,
         logging_steps=100,
         report_to="wandb" if config.wandb_project else "none",
-        gradient_checkpointing=not config.freeze_encoder,
+        gradient_checkpointing=config.gradient_checkpointing and not config.freeze_encoder,
         eval_accumulation_steps=8,
         **get_precision_kwargs(),
         **({"push_to_hub": True, "hub_model_id": config.hub_model_id} if config.hub_model_id else {}),
