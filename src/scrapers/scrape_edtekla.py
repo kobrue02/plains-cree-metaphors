@@ -18,7 +18,7 @@ import re
 import requests
 
 
-_RAW = "https://raw.githubusercontent.com/EdTeKLA/IndigenousLanguages_Corpora/main"
+_RAW = "https://raw.githubusercontent.com/EdTeKLA/IndigenousLanguages_Corpora/master"
 
 # All (cree_path, english_path, label) pairs confirmed present in the repo.
 # BoW-only files (e.g. SolomonRatt, Bible) are intentionally excluded.
