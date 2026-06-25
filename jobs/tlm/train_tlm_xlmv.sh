@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=TLM_XLMV_Cree_EN
-#SBATCH --partition=gpu_a100_short
+#SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=00:30:00
+#SBATCH --time=01:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
@@ -44,6 +44,7 @@ python3 main.py \
     --epochs 15 \
     --batch-size 4 \
     --grad-accum 8 \
+    --max-length 128 \
     --tlm-output-dir data/tlm_model_xlmv \
     --hub-model-id KonradBRG/xlm-v-base-plains-cree-en-tlm \
     --wandb-project fnlp-tlm
