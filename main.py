@@ -370,7 +370,14 @@ def predict_figurative(
 
 def split_sentences(output: str, confidence: float = 0.0) -> None:
     df = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
-    ParallelSentenceSplitter(df).write(output, min_confidence=confidence)
+    splitter = ParallelSentenceSplitter(df)
+    splitter.write(output, min_confidence=confidence)
+    sent_df = splitter.split()
+    if confidence > 0:
+        sent_df = sent_df[sent_df.confidence >= confidence]
+    csv_path = "data/bloomfield_texts_sentences.csv"
+    sent_df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    print(f"Saved {len(sent_df):,} sentence pairs → {csv_path}")
 
 
 # ── CLI ───────────────────────────────────────────────────────────────────────
