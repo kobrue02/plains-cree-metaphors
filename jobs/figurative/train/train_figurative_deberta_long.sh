@@ -1,11 +1,11 @@
 #!/bin/bash
 #SBATCH --job-name=Train_Figurative_DeBERTa
-#SBATCH --partition=gpu_a100_short
+#SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
 #SBATCH --gres=gpu:1
-#SBATCH --time=00:30:00
+#SBATCH --time=02:30:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
@@ -40,8 +40,8 @@ echo "Starting figurative training (DeBERTa-v3-base)..."
 python3 main.py \
     --train-figurative \
     --figurative-experiment deberta_teacher \
-    --batch-size 16 \
-    --epochs 4 \
+    --batch-size 32 \
+    --epochs 10 \
     --hub-model-id KonradBRG/deberta-v3-base-figurative \
     --wandb-project fnlp-figurative
 
