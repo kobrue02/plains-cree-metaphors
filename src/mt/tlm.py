@@ -156,7 +156,10 @@ class TLMFinetuner:
         print(f"[TLM] output   : {cfg.output_dir}")
 
         tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
-        model     = AutoModelForMaskedLM.from_pretrained(cfg.model_name)
+        model     = AutoModelForMaskedLM.from_pretrained(
+            cfg.model_name,
+            torch_dtype=torch.float32,  # load in FP32; Trainer casts to BF16 if needed
+        )
         if not getattr(model.config, "model_type", None):
             model.config.model_type = cfg.model_name.split("/")[-1].split("-")[0]
 
