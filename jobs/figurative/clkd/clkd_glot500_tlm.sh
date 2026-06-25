@@ -51,7 +51,7 @@ python3 main.py \
     --epochs 10 \
     --batch-size 16 \
     --hub-model-id KonradBRG/glot500-base-plains-cree-en-clkd-tlm \
-    --wandb-project fnlp-figurative
+    --wandb-project fnlp-clkd
 
 if [ $? -eq 0 ]; then
     echo "CLKD (Glot500 + TLM) completed successfully."

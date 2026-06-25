@@ -37,6 +37,11 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+try:
+    import wandb as _wandb
+except ImportError:
+    _wandb = None
+
 
 @dataclass
 class DistillConfig:
@@ -240,6 +245,22 @@ def _distill_clkd(config: DistillConfig) -> str:
         print(f"[distill] student fully trainable — "
               f"{sum(p.numel() for p in student.parameters() if p.requires_grad):,} params")
 
+    if _wandb and config.wandb_project:
+        _wandb.init(
+            project=config.wandb_project,
+            config={
+                "mode":             config.mode,
+                "student":          config.checkpoint,
+                "teacher":          config.teacher_checkpoint,
+                "freeze_n_layers":  config.freeze_n_layers,
+                "epochs":           config.epochs,
+                "batch_size":       config.batch_size,
+                "learning_rate":    config.learning_rate,
+                "temperature":      config.temperature,
+                "corpus_size":      None,
+            },
+        )
+
     df = (
         pd.read_csv(config.corpus_file, encoding="utf-8-sig")
         .dropna(subset=["text_cree", "text_en"])
@@ -247,6 +268,8 @@ def _distill_clkd(config: DistillConfig) -> str:
     print(f"[distill] mode=clkd  corpus={len(df):,} pairs  epochs={config.epochs}  "
           f"lr={config.learning_rate}  T={config.temperature}  "
           f"freeze_n={config.freeze_n_layers}")
+    if _wandb and _wandb.run:
+        _wandb.config.update({"corpus_size": len(df)}, allow_val_change=True)
 
     loader = DataLoader(
         CLKDDataset(df, teacher_tokenizer, student_tokenizer),
@@ -266,6 +289,7 @@ def _distill_clkd(config: DistillConfig) -> str:
     )
 
     student.train()
+    global_step = 0
     for epoch in range(config.epochs):
         epoch_loss = 0.0
         for batch in loader:
@@ -287,9 +311,15 @@ def _distill_clkd(config: DistillConfig) -> str:
             optimizer.step()
             scheduler.step()
             epoch_loss += loss.item()
+            global_step += 1
+            if _wandb and _wandb.run:
+                _wandb.log({"train/loss_step": loss.item(),
+                            "train/lr": scheduler.get_last_lr()[0]}, step=global_step)
 
-        print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
-              f"loss={epoch_loss / len(loader):.4f}")
+        avg_loss = epoch_loss / len(loader)
+        print(f"[distill] epoch {epoch + 1}/{config.epochs}  loss={avg_loss:.4f}")
+        if _wandb and _wandb.run:
+            _wandb.log({"train/loss_epoch": avg_loss, "epoch": epoch + 1}, step=global_step)
 
     student.save_pretrained(config.output_dir)
     student_tokenizer.save_pretrained(config.output_dir)
@@ -299,6 +329,9 @@ def _distill_clkd(config: DistillConfig) -> str:
         student.push_to_hub(config.hub_model_id)
         student_tokenizer.push_to_hub(config.hub_model_id)
         print(f"[distill] pushed to hub: {config.hub_model_id}")
+
+    if _wandb and _wandb.run:
+        _wandb.finish()
 
     return config.output_dir
 

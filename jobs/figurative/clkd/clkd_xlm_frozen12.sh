@@ -51,7 +51,7 @@ python3 main.py \
     --epochs 10 \
     --batch-size 16 \
     --hub-model-id KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12 \
-    --wandb-project fnlp-figurative
+    --wandb-project fnlp-clkd
 
 if [ $? -eq 0 ]; then
     echo "CLKD (frozen12) completed successfully."
