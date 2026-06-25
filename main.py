@@ -4,7 +4,7 @@ import os
 import pandas as pd
 from tqdm import tqdm
 
-from src.scrapers import BloomfieldScraper
+from src.scrapers import BloomfieldScraper, EdTeKLAScraper
 from src.eda import EDA
 from src.annotate import call_deepseek, format_prompt
 from src.mt import TLMFinetuner, TLMConfig, ParallelSentenceSplitter
@@ -42,6 +42,10 @@ METAPHOR_PRESETS = {
 def scrape() -> pd.DataFrame:
     df = BloomfieldScraper().scrape(output="data/bloomfield_texts.csv")
     return df
+
+
+def scrape_edtekla(output: str, append: bool = False) -> None:
+    EdTeKLAScraper().scrape(output=output, append=append)
 
 
 def eda(df: pd.DataFrame | None = None) -> None:
@@ -398,6 +402,12 @@ examples:
 
     parser.add_argument("--scrape",          action="store_true",
                         help="Scrape Bloomfield texts to data/bloomfield_texts.csv")
+    parser.add_argument("--scrape-edtekla", action="store_true",
+                        help="Download EdTeKLA parallel corpus and write src ||| tgt pairs")
+    parser.add_argument("--edtekla-output", default="data/sentences_edtekla.txt",
+                        help="Output path for --scrape-edtekla (default: data/sentences_edtekla.txt)")
+    parser.add_argument("--edtekla-append", action="store_true",
+                        help="Append EdTeKLA pairs to an existing file instead of overwriting")
     parser.add_argument("--eda",             action="store_true",
                         help="Run EDA and save figures to figures/")
     parser.add_argument("--annotate",        action="store_true",
@@ -482,7 +492,7 @@ examples:
 
     args = parser.parse_args()
 
-    if not any([args.scrape, args.eda, args.annotate,
+    if not any([args.scrape, args.scrape_edtekla, args.eda, args.annotate,
                 args.split_sentences, args.fine_tune, args.metaphor,
                 args.predict_cree, args.compare,
                 args.train_figurative, args.predict_figurative,
@@ -492,6 +502,9 @@ examples:
 
     if args.scrape:
         scrape()
+
+    if args.scrape_edtekla:
+        scrape_edtekla(args.edtekla_output, append=args.edtekla_append)
 
     if args.eda:
         eda()
