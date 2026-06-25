@@ -80,6 +80,7 @@ def train(config: FigurativeConfig) -> str:
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
+        save_total_limit=2,
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=100,
