@@ -213,7 +213,8 @@ def _distill_clkd(config: DistillConfig) -> str:
 
     # Teacher: frozen English figurative classifier
     print(f"[distill] loading teacher : {config.teacher_checkpoint}")
-    teacher_tokenizer = AutoTokenizer.from_pretrained(config.teacher_checkpoint)
+    _t_use_fast = "deberta-v3" not in config.teacher_checkpoint.lower()
+    teacher_tokenizer = AutoTokenizer.from_pretrained(config.teacher_checkpoint, use_fast=_t_use_fast)
     teacher = AutoModelForSequenceClassification.from_pretrained(
         config.teacher_checkpoint, torch_dtype=torch.float32,
     )
