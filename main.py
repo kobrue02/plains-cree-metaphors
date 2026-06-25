@@ -96,6 +96,7 @@ def fine_tune(
     wandb_project:  str | None = None,
     model_name:     str  = "xlm-roberta-base",
     output_dir:     str  = "data/tlm_model",
+    grad_accum:     int  = 2,
 ) -> str:
     if sentences_file:
         sent_df = pd.read_csv(
@@ -112,7 +113,7 @@ def fine_tune(
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
-    cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, hub_model_id=hub_model_id, wandb_project=wandb_project)
+    cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, grad_accum=grad_accum, hub_model_id=hub_model_id, wandb_project=wandb_project)
     ckpt = TLMFinetuner(cfg).fit(sent_df)
     return ckpt
 
@@ -438,6 +439,8 @@ examples:
                         help="Number of TLM training epochs (default: 5)")
     parser.add_argument("--batch-size",     type=int,   default=16,
                         help="Per-device train batch size (default: 16)")
+    parser.add_argument("--grad-accum",     type=int,   default=2,
+                        help="Gradient accumulation steps for --fine-tune (default: 2)")
     parser.add_argument("--hub-model-id",   default=None,
                         help="HuggingFace Hub repo ID to push the final model to (e.g. YourName/model-tag)")
     parser.add_argument("--wandb-project",   default=None,
@@ -526,7 +529,7 @@ examples:
         split_sentences(args.output, args.confidence)
 
     if args.fine_tune:
-        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project, args.model_name, args.tlm_output_dir)
+        ckpt = fine_tune(args.confidence, args.sentences_file, args.epochs, args.batch_size, args.hub_model_id, args.wandb_project, args.model_name, args.tlm_output_dir, args.grad_accum)
         print(f"Checkpoint: {ckpt}")
 
     if args.predict_cree:
