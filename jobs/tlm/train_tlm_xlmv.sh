@@ -42,8 +42,8 @@ python3 main.py \
     --sentences-file data/sentences.txt \
     --model-name facebook/xlm-v-base \
     --epochs 15 \
-    --batch-size 4 \
-    --grad-accum 8 \
+    --batch-size 16 \
+    --grad-accum 2 \
     --max-length 128 \
     --tlm-output-dir data/tlm_model_xlmv \
     --hub-model-id KonradBRG/xlm-v-base-plains-cree-en-tlm \
