@@ -51,6 +51,31 @@ print(f"Non-simile : {len(other_df):,} sentences")
 simile_texts = simile_df["text_cree"].tolist()
 other_texts  = other_df["text_cree"].tolist()
 
+# ── Teacher sanity check: what does DeBERTa predict on the English translations? ──
+# If the teacher itself misses similes in English, students can never learn them.
+TEACHER_ID = "KonradBRG/deberta-v3-base-figurative"
+en_simile_texts = simile_df["text_en"].dropna().tolist()
+print(f"\n{'='*60}")
+print(f"  Teacher sanity check ({len(en_simile_texts)} English tâpiskôc translations)")
+print(f"  {TEACHER_ID}")
+t_model, t_tok = load_model(TEACHER_ID)
+t_preds  = predict_sentences(en_simile_texts, t_model, t_tok)
+t_labels = [p["label"] for p in t_preds]
+del t_model
+torch.cuda.empty_cache()
+
+from collections import Counter
+t_dist = Counter(t_labels)
+t_simile_tp = t_dist.get("simile", 0) / len(t_labels)
+print(f"  Teacher label distribution on English tâpiskôc translations:")
+for label in ["literal", "idiom", "metaphor", "simile"]:
+    n = t_dist.get(label, 0)
+    print(f"    {label:10s}: {n:3d}  ({n / len(t_labels):.1%})")
+print(f"  → Teacher simile TP: {t_simile_tp:.1%}")
+if t_simile_tp < 0.10:
+    print("  ! Teacher rarely labels these as simile — "
+          "student soft labels are noisy for this class.")
+
 summary_rows = []
 detail_rows  = []
 
