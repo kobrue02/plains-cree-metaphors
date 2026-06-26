@@ -12,7 +12,7 @@ Output: data/figurative/eval_simile_detection.csv
 
 from __future__ import annotations
 import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 import re
 import torch

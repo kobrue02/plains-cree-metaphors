@@ -38,13 +38,13 @@ mkdir -p logs
 
 # 4. Run evaluations
 echo "=== (1) English-Cree Consistency ==="
-python3 scripts/eval_consistency.py
+python3 scripts/evals/eval_consistency.py
 
 echo "=== (2) Figurative Rate on Bloomfield ==="
-python3 scripts/eval_figurative_rate.py
+python3 scripts/evals/eval_figurative_rate.py
 
 echo "=== (3) Simile Detection (tâpiskôc) ==="
-python3 scripts/eval_simile_detection.py
+python3 scripts/evals/eval_simile_detection.py
 
 echo "All evaluations complete."
 echo "Results in data/figurative/eval_consistency.csv"

@@ -1,0 +1,43 @@
+# Sweep for CLKD stage — optimises held-out KL divergence (10% corpus split)
+# Metric: eval/kl_epoch (minimize)
+#
+# The TLM checkpoint is fixed — set --tlm-ckpt to the best TLM run's output
+# or a Hub model before running this sweep.
+#
+# Create:  wandb sweep sweeps/clkd.yaml
+# Run:     sbatch jobs/sweep_agent.sh <sweep_id>
+
+program: tune.py
+method: bayes
+metric:
+  name: eval/kl_epoch
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+
+parameters:
+  epochs:
+    values: [5, 10, 15]
+  learning_rate:
+    distribution: log_uniform_values
+    min: 1.0e-6
+    max: 5.0e-5
+  temperature:
+    values: [1.0, 2.0, 3.0, 4.0]
+  freeze_n_layers:
+    values: [0, 6, 12]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --stage
+  - clkd
+  - --tlm-ckpt
+  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm   # update after TLM sweep
+  - --output-dir
+  - data/sweep_clkd_trial
+  - --max-length
+  - "256"
+  - ${args}

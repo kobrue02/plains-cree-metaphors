@@ -1,0 +1,40 @@
+# Sweep for TLM stage — optimises held-out MLM/TLM loss
+# Metric: eval/loss (minimize)
+#
+# Create:  wandb sweep sweeps/tlm.yaml
+# Run:     sbatch jobs/sweep_agent.sh <sweep_id>
+
+program: tune.py
+method: bayes
+metric:
+  name: eval/loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+
+parameters:
+  epochs:
+    values: [5, 10, 15, 20]
+  learning_rate:
+    distribution: log_uniform_values
+    min: 5.0e-5
+    max: 3.0e-4
+  batch_size:
+    values: [8, 16]
+  grad_accum:
+    values: [1, 2, 4]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --stage
+  - tlm
+  - --base-model
+  - FacebookAI/xlm-mlm-100-1280
+  - --output-dir
+  - data/sweep_tlm_trial
+  - --max-length
+  - "256"
+  - ${args}

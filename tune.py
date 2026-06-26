@@ -1,0 +1,136 @@
+"""
+Single-trial runner for wandb hyperparameter sweeps.
+
+Each invocation runs one trial for one pipeline stage, logging the
+stage-appropriate metric to wandb so the sweep controller can guide
+the next trial via Bayesian optimisation.
+
+Metrics optimised per stage:
+  tlm       → eval/loss       (minimize)  — TLM held-out MLM/TLM loss
+  clkd      → eval/kl_epoch   (minimize)  — held-out KL on 10% corpus split
+  calibrate → eval/macro_f1   (maximize)  — macro F1 on held-out annotation split
+
+Usage:
+  # 1. Create a sweep (once per stage):
+  wandb sweep sweeps/calibrate.yaml          # prints <entity/project/sweep_id>
+
+  # 2. Submit N parallel agents on the cluster:
+  sbatch jobs/sweep_agent.sh <sweep_id>      # repeat for desired parallelism
+
+  # 3. Pick best run in wandb UI or:
+  python tune.py --stage calibrate --show-best --sweep-id <sweep_id>
+"""
+
+from __future__ import annotations
+import os, sys, argparse
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import wandb
+
+WANDB_PROJECT  = "fnlp-tune"
+TEACHER        = "KonradBRG/deberta-v3-base-figurative"
+SENTENCES_FILE = "data/sentences.txt"
+CORPUS_FILE    = "data/bloomfield_texts_sentences.csv"
+ANNOT_FILE     = "data/figurative/bloomfield_annotated.csv"
+
+
+# ── Stage runners ──────────────────────────────────────────────────────────────
+
+def run_tlm(args: argparse.Namespace) -> None:
+    from funcs import fine_tune
+    wandb.init(project=WANDB_PROJECT)
+    cfg = wandb.config
+    fine_tune(
+        sentences_file=args.sentences_file,
+        model_name=args.base_model,
+        output_dir=args.output_dir,
+        epochs=cfg.get("epochs", 15),
+        batch_size=cfg.get("batch_size", 16),
+        learning_rate=cfg.get("learning_rate", 2e-5),
+        grad_accum=cfg.get("grad_accum", 2),
+        max_length=args.max_length,
+        wandb_project=WANDB_PROJECT,
+    )
+
+
+def run_clkd(args: argparse.Namespace) -> None:
+    from funcs import figurative_distill
+    wandb.init(project=WANDB_PROJECT)
+    cfg = wandb.config
+    figurative_distill(
+        checkpoint=args.tlm_ckpt,
+        teacher_checkpoint=args.teacher,
+        mode="clkd",
+        corpus_file=args.corpus_file,
+        epochs=cfg.get("epochs", 10),
+        batch_size=args.batch_size,
+        learning_rate=cfg.get("learning_rate", 5e-6),
+        temperature=cfg.get("temperature", 2.0),
+        freeze_n_layers=cfg.get("freeze_n_layers", 0),
+        output_dir=args.output_dir,
+        wandb_project=WANDB_PROJECT,
+    )
+
+
+def run_calibrate(args: argparse.Namespace) -> None:
+    from funcs import calibrate
+    wandb.init(project=WANDB_PROJECT)
+    cfg = wandb.config
+    calibrate(
+        checkpoint=args.clkd_ckpt,
+        output_dir=args.output_dir,
+        annot_file=args.annot_file,
+        epochs=cfg.get("epochs", 10),
+        batch_size=args.batch_size,
+        learning_rate=cfg.get("learning_rate", 5e-6),
+        literal_ratio=cfg.get("literal_ratio", 3),
+        max_length=args.max_length,
+        gold_only=args.gold_only,
+        wandb_project=WANDB_PROJECT,  # non-None so Trainer uses report_to="wandb"
+    )
+
+
+# ── Entry point ────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    p = argparse.ArgumentParser(
+        description="One sweep trial for a single pipeline stage",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=__doc__,
+    )
+    p.add_argument("--stage", required=True, choices=["tlm", "clkd", "calibrate"])
+
+    # Input checkpoints (fixed across all trials for a given sweep)
+    p.add_argument("--base-model",   default="FacebookAI/xlm-mlm-100-1280",
+                   help="Base model for TLM stage")
+    p.add_argument("--tlm-ckpt",     default=None,
+                   help="TLM checkpoint for CLKD stage")
+    p.add_argument("--clkd-ckpt",    default=None,
+                   help="CLKD checkpoint for calibrate stage")
+
+    # Fixed (non-swept) trial params
+    p.add_argument("--output-dir",     default="data/sweep_trial")
+    p.add_argument("--sentences-file", default=SENTENCES_FILE)
+    p.add_argument("--corpus-file",    default=CORPUS_FILE)
+    p.add_argument("--annot-file",     default=ANNOT_FILE)
+    p.add_argument("--teacher",        default=TEACHER)
+    p.add_argument("--batch-size",     type=int,  default=16)
+    p.add_argument("--max-length",     type=int,  default=256)
+    p.add_argument("--gold-only",      action="store_true")
+
+    args = p.parse_args()
+
+    if args.stage == "tlm":
+        run_tlm(args)
+    elif args.stage == "clkd":
+        if not args.tlm_ckpt:
+            p.error("--tlm-ckpt is required for --stage clkd")
+        run_clkd(args)
+    elif args.stage == "calibrate":
+        if not args.clkd_ckpt:
+            p.error("--clkd-ckpt is required for --stage calibrate")
+        run_calibrate(args)
+
+
+if __name__ == "__main__":
+    main()

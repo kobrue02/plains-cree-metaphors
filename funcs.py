@@ -10,6 +10,7 @@ from src.mt import TLMFinetuner, TLMConfig, ParallelSentenceSplitter
 from src.figurative import config as figurative_config
 from src.figurative.train import train as figurative_train_fn
 from src.figurative.distill import distill as figurative_distill_fn, DistillConfig
+from src.figurative.calibrate import calibrate as figurative_calibrate_fn, CalibrateConfig
 from src.figurative.predict import (
     load_model as figurative_load_model,
     predict_sentences,
@@ -79,8 +80,9 @@ def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
 def fine_tune(
     confidence:     float = 0.0,
     sentences_file: str | None = None,
-    epochs:         int  = 5,
-    batch_size:     int  = 16,
+    epochs:         int   = 5,
+    batch_size:     int   = 16,
+    learning_rate:  float = 2e-5,
     hub_model_id:   str | None = None,
     wandb_project:  str | None = None,
     model_name:     str  = "xlm-roberta-base",
@@ -104,7 +106,7 @@ def fine_tune(
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
-    cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, grad_accum=grad_accum, max_length=max_length, hub_model_id=hub_model_id, wandb_project=wandb_project)
+    cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, grad_accum=grad_accum, max_length=max_length, hub_model_id=hub_model_id, wandb_project=wandb_project)
     ckpt = TLMFinetuner(cfg).fit(sent_df)
     return ckpt
 
@@ -164,6 +166,36 @@ def figurative_distill(
         wandb_project=wandb_project,
     )
     return figurative_distill_fn(cfg)
+
+
+def calibrate(
+    checkpoint:   str,
+    output_dir:   str        = "data/calibrated",
+    hub_model_id: str | None = None,
+    wandb_project: str | None = None,
+    annot_file:   str        = "data/figurative/bloomfield_annotated.csv",
+    epochs:       int        = 10,
+    batch_size:   int        = 8,
+    learning_rate: float     = 5e-6,
+    max_length:   int        = 128,
+    literal_ratio: int       = 3,
+    gold_only:    bool       = False,
+) -> str:
+    """Calibrate a CLKD model on DeepSeek-annotated Bloomfield sentences."""
+    cfg = CalibrateConfig(
+        checkpoint=checkpoint,
+        annot_file=annot_file,
+        output_dir=output_dir,
+        hub_model_id=hub_model_id,
+        wandb_project=wandb_project,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        max_length=max_length,
+        literal_ratio=literal_ratio,
+        gold_only=gold_only,
+    )
+    return figurative_calibrate_fn(cfg)
 
 
 def figurative_eval_idioms(

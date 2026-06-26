@@ -27,6 +27,7 @@ import re
 from dataclasses import dataclass
 
 import pandas as pd
+from sklearn.model_selection import train_test_split as _train_test_split
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -245,21 +246,22 @@ def _distill_clkd(config: DistillConfig) -> str:
         print(f"[distill] student fully trainable — "
               f"{sum(p.numel() for p in student.parameters() if p.requires_grad):,} params")
 
+    _clkd_cfg = {
+        "mode":             config.mode,
+        "student":          config.checkpoint,
+        "teacher":          config.teacher_checkpoint,
+        "freeze_n_layers":  config.freeze_n_layers,
+        "epochs":           config.epochs,
+        "batch_size":       config.batch_size,
+        "learning_rate":    config.learning_rate,
+        "temperature":      config.temperature,
+        "corpus_size":      None,
+    }
     if _wandb and config.wandb_project:
-        _wandb.init(
-            project=config.wandb_project,
-            config={
-                "mode":             config.mode,
-                "student":          config.checkpoint,
-                "teacher":          config.teacher_checkpoint,
-                "freeze_n_layers":  config.freeze_n_layers,
-                "epochs":           config.epochs,
-                "batch_size":       config.batch_size,
-                "learning_rate":    config.learning_rate,
-                "temperature":      config.temperature,
-                "corpus_size":      None,
-            },
-        )
+        if not _wandb.run:
+            _wandb.init(project=config.wandb_project, config=_clkd_cfg)
+        else:
+            _wandb.config.update(_clkd_cfg, allow_val_change=True)
 
     df = (
         pd.read_csv(config.corpus_file, encoding="utf-8-sig")
@@ -271,10 +273,22 @@ def _distill_clkd(config: DistillConfig) -> str:
     if _wandb and _wandb.run:
         _wandb.config.update({"corpus_size": len(df)}, allow_val_change=True)
 
+    if len(df) >= 20:
+        train_df, eval_df = _train_test_split(df, test_size=0.1, random_state=42)
+    else:
+        train_df, eval_df = df, df
+
     loader = DataLoader(
-        CLKDDataset(df, teacher_tokenizer, student_tokenizer),
+        CLKDDataset(train_df, teacher_tokenizer, student_tokenizer,
+                    max_length=config.max_length),
         batch_size=config.batch_size,
         shuffle=True,
+    )
+    eval_loader = DataLoader(
+        CLKDDataset(eval_df, teacher_tokenizer, student_tokenizer,
+                    max_length=config.max_length),
+        batch_size=config.batch_size,
+        shuffle=False,
     )
 
     optimizer = torch.optim.AdamW(
@@ -317,9 +331,31 @@ def _distill_clkd(config: DistillConfig) -> str:
                             "train/lr": scheduler.get_last_lr()[0]}, step=global_step)
 
         avg_loss = epoch_loss / len(loader)
-        print(f"[distill] epoch {epoch + 1}/{config.epochs}  loss={avg_loss:.4f}")
+
+        student.eval()
+        eval_loss = 0.0
+        with torch.no_grad():
+            for eval_batch in eval_loader:
+                t_logits = teacher(
+                    input_ids=eval_batch["teacher_input_ids"].to(device),
+                    attention_mask=eval_batch["teacher_attention_mask"].to(device),
+                ).logits
+                s_logits = student(
+                    input_ids=eval_batch["student_input_ids"].to(device),
+                    attention_mask=eval_batch["student_attention_mask"].to(device),
+                ).logits
+                eval_loss += _clkd_loss(t_logits, s_logits, config.temperature).item()
+        eval_avg = eval_loss / len(eval_loader)
+        student.train()
+
+        print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
+              f"train_loss={avg_loss:.4f}  eval_kl={eval_avg:.4f}")
         if _wandb and _wandb.run:
-            _wandb.log({"train/loss_epoch": avg_loss, "epoch": epoch + 1}, step=global_step)
+            _wandb.log({
+                "train/loss_epoch": avg_loss,
+                "eval/kl_epoch":    eval_avg,
+                "epoch":            epoch + 1,
+            }, step=global_step)
 
     student.save_pretrained(config.output_dir)
     student_tokenizer.save_pretrained(config.output_dir)

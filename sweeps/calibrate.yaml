@@ -1,0 +1,45 @@
+# Sweep for calibration stage — optimises macro F1 on held-out annotation split
+# Metric: eval/macro_f1 (maximize)
+#
+# The CLKD checkpoint is fixed — set --clkd-ckpt to the best CLKD run's output
+# or a Hub model before running this sweep.
+#
+# Calibration trials are fast (~15 min each); run 20+ trials for good coverage.
+#
+# Create:  wandb sweep sweeps/calibrate.yaml
+# Run:     sbatch jobs/sweep_agent.sh <sweep_id>   (repeat for parallelism)
+
+program: tune.py
+method: bayes
+metric:
+  name: eval/macro_f1
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+
+parameters:
+  epochs:
+    values: [5, 10, 15, 20]
+  learning_rate:
+    distribution: log_uniform_values
+    min: 5.0e-7
+    max: 2.0e-5
+  literal_ratio:
+    values: [1, 2, 3, 5]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --stage
+  - calibrate
+  - --clkd-ckpt
+  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd   # update after CLKD sweep
+  - --output-dir
+  - data/sweep_calibrate_trial
+  - --batch-size
+  - "8"
+  - --max-length
+  - "128"
+  - ${args}
