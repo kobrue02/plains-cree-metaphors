@@ -35,11 +35,10 @@ command:
   - --stage
   - calibrate
   - --clkd-ckpt
-  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd   # update after CLKD sweep
+  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full
   - --output-dir
   - data/sweep_calibrate_trial
   - --batch-size
   - "8"
   - --max-length
   - "128"
-  - ${args}

@@ -1,0 +1,236 @@
+"""
+Parser for "Ojibwa Texts" (Jones/Michelson 1917, Vol. VII Part I).
+
+The book is a facing-page dual-language edition: even pages = Ojibwe text
+(with left-margin line numbers 5, 10, 15...), odd pages = English translation.
+The Internet Archive djvu OCR dump alternates pages in sequence, so Ojibwe
+and English paragraphs interleave in the file.
+
+Strategy
+--------
+1. Split the raw text into blank-line-delimited blocks.
+2. Classify each block as ojibwe / english / header / meta / footnote.
+3. Pull story headers out as section boundaries.
+4. Within each story, collect Ojibwe and English paragraphs into two lists.
+5. Zip the two lists → aligned paragraph pairs.
+
+Output: CSV with columns  story, para_idx, text_ojibwe, text_en
+"""
+
+from __future__ import annotations
+import re
+import csv
+import os
+import sys
+from pathlib import Path
+from dataclasses import dataclass, field
+
+# ── Language detection ─────────────────────────────────────────────────────────
+
+# Strong Ojibwe markers: vowel-apostrophe clusters, affricates tc/dc,
+# subscript digit sequences like a11/Ii8i/o8, /u /i encodings.
+_OJI_RE = re.compile(
+    r"[aeiou]['''][a-z]"          # vowel-apostrophe (a'pi, o'o')
+    r"|[a-z][0-9]{1,2}[a-z]"     # subscript numbers: a11, Ii8i
+    r"|\b(tc|dc)[a-z]"            # Ojibwe affricates
+    r"|[/'\\][uia][/\\]"          # /u /i encodings
+    r"|ugri|midac|misa|kaga|cigwa|anlc|mldac|ugrl|uglwab",
+)
+
+_EN_WORDS = re.compile(
+    r"\b(the|was|and|that|had|her|him|with|this|then|they|were|have|from|"
+    r"upon|when|said|told|thus|what|where|some|did|now|him|one|who|"
+    r"verily|therefore|hither|thereof)\b",
+    re.IGNORECASE,
+)
+
+# Bare page number or Roman numerals line (to skip)
+_PAGE_NUM_RE = re.compile(r"^[IVXLC]+$|^\d+$")
+
+# Story-section headers: "i. THE BIRTH OF NANABUSHU." or "2. THE THEFT OF FIRE."
+# Both Arabic and lower-case Roman numerals (i, ii, iii...) are used.
+_HEADER_RE = re.compile(
+    r"^[ivxlc\d]+\."          # "i." or "2."
+    r"\s+[A-Z][A-Z\s,'\-]{4,}"  # title in caps
+    r"[.\d]*\s*$",             # optional trailing footnote ref or period
+    re.IGNORECASE,
+)
+
+# Series/chapter dividers (not story headers)
+_SERIES_RE = re.compile(r"^(SERIES|PART|I\s*[.—-]|II\s*[.—-])", re.IGNORECASE)
+
+# Footnote: short line starting with a digit (e.g.  "1 Saga'a'man, 'when you go out'")
+_FOOTNOTE_RE = re.compile(r"^\d+\s+\S")
+
+
+def _ojibwe_score(text: str) -> int:
+    return len(_OJI_RE.findall(text))
+
+
+def _english_score(text: str) -> int:
+    return len(_EN_WORDS.findall(text))
+
+
+def classify_block(raw: str) -> str:
+    """Return 'ojibwe' | 'english' | 'header' | 'meta' | 'footnote'."""
+    text = " ".join(raw.split())  # collapse whitespace for pattern matching
+    if not text:
+        return "meta"
+
+    # Bare page numbers / Roman numerals
+    if _PAGE_NUM_RE.match(text):
+        return "meta"
+
+    # Series / part dividers
+    if _SERIES_RE.match(text):
+        return "meta"
+
+    # Publication header / preface boilerplate (all-caps short line)
+    if re.match(r"^[A-Z\s.,'\-]{3,60}$", text) and len(text.split()) <= 8:
+        return "meta"
+
+    # Story headers
+    if _HEADER_RE.match(text):
+        return "header"
+
+    # Footnotes: short block starting with a digit
+    if _FOOTNOTE_RE.match(text) and len(text) < 300:
+        return "footnote"
+
+    # Language score
+    oji = _ojibwe_score(text)
+    eng = _english_score(text)
+    if oji == 0 and eng == 0:
+        return "meta"
+    return "ojibwe" if oji >= eng else "english"
+
+
+# ── Text cleaning ──────────────────────────────────────────────────────────────
+
+_MARGIN_NUM_RE = re.compile(r"(?m)^\s*\d+\s{2,}")  # "5   " at line start
+
+
+def clean_block(raw: str) -> str:
+    """Normalize OCR artifacts in a paragraph."""
+    # Strip left-margin line numbers (Ojibwe text only)
+    text = _MARGIN_NUM_RE.sub("", raw)
+    # Collapse multiple spaces / fix OCR double-space typesetting
+    text = re.sub(r"  +", " ", text)
+    # Rejoin hyphenated line-breaks: "some-\nthing" → "something"
+    text = re.sub(r"-\s*\n\s*", "", text)
+    # Strip remaining newlines
+    text = re.sub(r"\s*\n\s*", " ", text)
+    return text.strip()
+
+
+def strip_header(text: str) -> str:
+    """Normalize a story header to a stable key."""
+    # Remove OCR noise, extra spaces, trailing footnote digits
+    t = re.sub(r"\s+", " ", text).strip()
+    t = re.sub(r"\d+\s*$", "", t).strip().rstrip(".")
+    return t.upper()
+
+
+# ── Parser ─────────────────────────────────────────────────────────────────────
+
+@dataclass
+class Story:
+    title: str
+    ojibwe: list[str] = field(default_factory=list)
+    english: list[str] = field(default_factory=list)
+
+
+def parse(path: str | Path) -> list[Story]:
+    raw = Path(path).read_text(encoding="utf-8", errors="replace")
+
+    # Locate where the actual texts begin (after preface/front matter).
+    # The first Ojibwe story paragraph starts after the first story header.
+    match = re.search(
+        r"(?m)^i\.?\s+THE\s+BIRTH\s+OF\s+NANABUSHU",
+        raw, re.IGNORECASE,
+    )
+    if match:
+        raw = raw[match.start():]
+
+    # Split into blank-line-separated blocks
+    blocks = re.split(r"\n{2,}", raw)
+
+    stories: dict[str, Story] = {}
+    current_title = "__preamble__"
+    stories[current_title] = Story(title=current_title)
+
+    for block in blocks:
+        label = classify_block(block)
+        if label == "header":
+            key = strip_header(block)
+            if key not in stories:
+                stories[key] = Story(title=key)
+            current_title = key
+            continue
+        if label in ("meta", "footnote"):
+            continue
+        text = clean_block(block)
+        if not text or len(text) < 10:
+            continue
+        if label == "ojibwe":
+            stories[current_title].ojibwe.append(text)
+        elif label == "english":
+            stories[current_title].english.append(text)
+
+    # Remove the preamble stub
+    stories.pop("__preamble__", None)
+    return list(stories.values())
+
+
+# ── Output ─────────────────────────────────────────────────────────────────────
+
+def to_csv(stories: list[Story], out_path: str | Path) -> None:
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        writer.writerow(["story", "para_idx", "text_ojibwe", "text_en"])
+        for story in stories:
+            pairs = list(zip(story.ojibwe, story.english))
+            for i, (oji, eng) in enumerate(pairs):
+                writer.writerow([story.title, i, oji, eng])
+
+
+def to_parallel(stories: list[Story], out_path: str | Path) -> None:
+    """Write src ||| tgt format for TLM fine-tuning."""
+    Path(out_path).parent.mkdir(parents=True, exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as f:
+        for story in stories:
+            for oji, eng in zip(story.ojibwe, story.english):
+                f.write(f"{oji} ||| {eng}\n")
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
+
+if __name__ == "__main__":
+    import argparse
+
+    p = argparse.ArgumentParser(description="Parse Jones/Michelson Ojibwa Texts into aligned paragraph pairs.")
+    p.add_argument("--input",   default="data/ojibwatextscoll07jonerich_djvu.txt")
+    p.add_argument("--csv",     default="data/ojibwe_texts_aligned.csv")
+    p.add_argument("--parallel", default=None,
+                   help="Also write src ||| tgt file for TLM (e.g. data/ojibwe_sentences.txt)")
+    p.add_argument("--verbose", action="store_true")
+    args = p.parse_args()
+
+    print(f"Parsing {args.input} ...")
+    stories = parse(args.input)
+
+    total_pairs = sum(min(len(s.ojibwe), len(s.english)) for s in stories)
+    print(f"Found {len(stories)} stories  →  {total_pairs} aligned paragraph pairs")
+
+    if args.verbose:
+        for s in stories:
+            n = min(len(s.ojibwe), len(s.english))
+            print(f"  {s.title[:60]:<60}  oji={len(s.ojibwe)}  en={len(s.english)}  pairs={n}")
+
+    to_csv(stories, args.csv)
+    print(f"Saved CSV  → {args.csv}")
+
+    if args.parallel:
+        to_parallel(stories, args.parallel)
+        print(f"Saved TLM  → {args.parallel}")

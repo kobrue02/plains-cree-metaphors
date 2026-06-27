@@ -37,4 +37,3 @@ command:
   - data/sweep_tlm_trial
   - --max-length
   - "256"
-  - ${args}

@@ -40,4 +40,3 @@ command:
   - data/sweep_clkd_trial
   - --max-length
   - "256"
-  - ${args}
