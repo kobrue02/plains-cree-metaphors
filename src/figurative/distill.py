@@ -67,6 +67,7 @@ class DistillConfig:
     learning_rate: float = 5e-6
     warmup_ratio:  float = 0.1
     temperature:   float = 2.0
+    max_length:    int   = 256
 
     # ── align / binary_kl only ────────────────────────────────────────────────
     freeze_head:   bool  = True

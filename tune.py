@@ -29,7 +29,7 @@ import wandb
 
 WANDB_PROJECT  = "FNLP"
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
-SENTENCES_FILE = "data/sentences.txt"
+SENTENCES_FILE = "data/sentences_combined.txt"
 CORPUS_FILE    = "data/bloomfield_texts_sentences.csv"
 ANNOT_FILE     = "data/figurative/bloomfield_annotated.csv"
 
