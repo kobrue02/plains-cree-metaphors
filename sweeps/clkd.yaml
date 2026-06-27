@@ -36,7 +36,7 @@ command:
   - --stage
   - clkd
   - --tlm-ckpt
-  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm
+  - KonradBRG/xlm-mlm-plains-cree-en-tlm
   - --output-dir
   - data/sweep_clkd_trial
   - --max-length
