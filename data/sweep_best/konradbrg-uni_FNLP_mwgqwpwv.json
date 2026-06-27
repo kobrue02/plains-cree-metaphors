@@ -1,0 +1,16 @@
+{
+  "sweep_id": "konradbrg-uni/FNLP/mwgqwpwv",
+  "stage": "tlm",
+  "metric": "eval/loss",
+  "best_value": 0.937619686126709,
+  "run_id": "3dg712we",
+  "run_name": "polar-sweep-11",
+  "config": {
+    "epochs": 5,
+    "batch_size": 8,
+    "grad_accum": 4,
+    "learning_rate": 6.131336251496209e-05,
+    "sentences_file": "data/sentences_combined.txt"
+  },
+  "n_runs": 11
+}

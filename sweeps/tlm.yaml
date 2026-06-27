@@ -4,6 +4,7 @@
 # Create:  wandb sweep sweeps/tlm.yaml
 # Run:     sbatch jobs/sweep_agent.sh <sweep_id>
 
+project: FNLP
 program: tune.py
 method: bayes
 metric:

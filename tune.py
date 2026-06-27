@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import wandb
 
-WANDB_PROJECT  = "fnlp-tune"
+WANDB_PROJECT  = "FNLP"
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
 SENTENCES_FILE = "data/sentences.txt"
 CORPUS_FILE    = "data/bloomfield_texts_sentences.csv"

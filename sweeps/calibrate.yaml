@@ -9,6 +9,7 @@
 # Create:  wandb sweep sweeps/calibrate.yaml
 # Run:     sbatch jobs/sweep_agent.sh <sweep_id>   (repeat for parallelism)
 
+project: FNLP
 program: tune.py
 method: bayes
 metric:
