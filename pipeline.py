@@ -90,6 +90,8 @@ def main() -> None:
     # Calibration
     p.add_argument("--calibrate-epochs", type=int,   default=10)
     p.add_argument("--calibrate-lr",     type=float, default=5e-6)
+    p.add_argument("--literal-ratio",    type=int,   default=3,
+                   help="Literals per figurative sentence in calibration data (default: 3)")
     p.add_argument("--annot-file",       default=ANNOT_FILE)
     p.add_argument("--gold-only",        action="store_true",
                    help="Calibrate on footnote_applies=True sentences only")
@@ -161,6 +163,7 @@ def main() -> None:
             epochs=args.calibrate_epochs,
             batch_size=min(args.batch_size, 8),
             learning_rate=args.calibrate_lr,
+            literal_ratio=args.literal_ratio,
             max_length=min(args.max_length, 128),
             gold_only=args.gold_only,
             wandb_project=args.wandb_project,
