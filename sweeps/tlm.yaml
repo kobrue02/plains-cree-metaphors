@@ -14,6 +14,10 @@ early_terminate:
   min_iter: 3
 
 parameters:
+  sentences_file:
+    values:
+      - data/sentences.txt
+      - data/sentences_combined.txt
   epochs:
     values: [5, 10, 15, 20]
   learning_rate:

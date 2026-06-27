@@ -40,10 +40,11 @@ def run_tlm(args: argparse.Namespace) -> None:
     from funcs import fine_tune
     wandb.init(project=WANDB_PROJECT)
     cfg = wandb.config
+    output_dir = f"{args.output_dir}_{wandb.run.id}"
     fine_tune(
-        sentences_file=args.sentences_file,
+        sentences_file=cfg.get("sentences_file", args.sentences_file),
         model_name=args.base_model,
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         epochs=cfg.get("epochs", 15),
         batch_size=cfg.get("batch_size", 16),
         learning_rate=cfg.get("learning_rate", 2e-5),
@@ -57,6 +58,7 @@ def run_clkd(args: argparse.Namespace) -> None:
     from funcs import figurative_distill
     wandb.init(project=WANDB_PROJECT)
     cfg = wandb.config
+    output_dir = f"{args.output_dir}_{wandb.run.id}"
     figurative_distill(
         checkpoint=args.tlm_ckpt,
         teacher_checkpoint=args.teacher,
@@ -67,7 +69,7 @@ def run_clkd(args: argparse.Namespace) -> None:
         learning_rate=cfg.get("learning_rate", 5e-6),
         temperature=cfg.get("temperature", 2.0),
         freeze_n_layers=cfg.get("freeze_n_layers", 0),
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         wandb_project=WANDB_PROJECT,
     )
 
@@ -76,9 +78,10 @@ def run_calibrate(args: argparse.Namespace) -> None:
     from funcs import calibrate
     wandb.init(project=WANDB_PROJECT)
     cfg = wandb.config
+    output_dir = f"{args.output_dir}_{wandb.run.id}"
     calibrate(
         checkpoint=args.clkd_ckpt,
-        output_dir=args.output_dir,
+        output_dir=output_dir,
         annot_file=args.annot_file,
         epochs=cfg.get("epochs", 10),
         batch_size=args.batch_size,

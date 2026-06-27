@@ -32,10 +32,11 @@ STAGE_FLAGS = {
         "freeze_n_layers": "--freeze-layers",
     },
     "tlm": {
-        "learning_rate": "--tlm-lr",
-        "epochs":        "--tlm-epochs",
-        "batch_size":    "--batch-size",
-        "grad_accum":    "--grad-accum",
+        "learning_rate":  "--tlm-lr",
+        "epochs":         "--tlm-epochs",
+        "batch_size":     "--batch-size",
+        "grad_accum":     "--grad-accum",
+        "sentences_file": "--sentences-file",
     },
 }
 
