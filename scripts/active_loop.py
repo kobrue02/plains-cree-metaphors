@@ -94,26 +94,48 @@ def phase_infer(checkpoint: str) -> pd.DataFrame:
 
 # ── Phase 2: DeepSeek annotation ─────────────────────────────────────────────
 
+_SYSTEM_PROMPT = """\
+You are annotating Plains Cree sentences from Leonard Bloomfield's 1934 fieldwork
+transcriptions for figurative language.
+
+Critical context:
+- The English gloss is a MEANING-FOR-MEANING translation, not word-for-word.
+  It already conveys the intended sense, so a gloss that reads literally in
+  English does NOT mean the Cree original is literal.
+- Figurative language must be identified in the CREE STRUCTURE. Compare the
+  word-level Cree meanings (from the dictionary entries) against the English
+  gloss: if the Cree words say one thing literally but the gloss says something
+  different, figurative language is likely present.
+- Plains Cree oral narratives make heavy use of idioms (fixed expressions whose
+  meaning cannot be composed from parts), metaphors (conceptual transfers, e.g.
+  body-part terms used for landscape or emotions), and similes (explicit
+  comparisons with 'like').
+- Our trained cross-lingual classifier has already flagged this sentence.
+  Treat its prediction as a meaningful prior — only override it if the
+  word-level evidence clearly supports a different label.
+
+Respond with EXACTLY one word: literal / metaphor / idiom / simile\
+"""
+
+
 def _deepseek_annotate_one(prompt: str, model_probs: dict) -> str:
     from openai import OpenAI
     client = OpenAI(
         api_key=os.environ["DEEPSEEK_API_KEY"],
         base_url="https://api.deepseek.com",
     )
-    prob_str = "  ".join(f"{k}={v:.2f}" for k, v in model_probs.items())
+    top_label = max(model_probs, key=model_probs.__getitem__)
+    top_conf  = model_probs[top_label]
+    model_note = (
+        f"Classifier prediction: {top_label.upper()} ({top_conf:.0%} confidence)\n"
+        f"Full distribution: "
+        + "  ".join(f"{k}={v:.2f}" for k, v in model_probs.items())
+    )
     resp = client.chat.completions.create(
         model="deepseek-reasoner",
         messages=[
-            {"role": "system", "content": (
-                "You are an expert in Plains Cree linguistics and figurative language. "
-                "Classify the sentence as: literal, metaphor, idiom, or simile. "
-                "Respond with ONLY one word."
-            )},
-            {"role": "user", "content": (
-                f"{prompt}\n\n"
-                f"Model probability estimates: {prob_str}\n"
-                "Your classification (literal/metaphor/idiom/simile):"
-            )},
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user",   "content": f"{prompt}\n\n{model_note}\n\nYour label:"},
         ],
         max_tokens=10,
     )
