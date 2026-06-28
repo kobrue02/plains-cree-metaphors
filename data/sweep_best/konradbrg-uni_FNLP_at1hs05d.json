@@ -1,0 +1,14 @@
+{
+  "sweep_id": "konradbrg-uni/FNLP/at1hs05d",
+  "stage": "calibrate",
+  "metric": "eval/macro_f1",
+  "best_value": 0.5342391304347827,
+  "run_id": "qy5zi7vv",
+  "run_name": "wild-sweep-48",
+  "config": {
+    "epochs": 15,
+    "learning_rate": 3.7752078444552175e-06,
+    "literal_ratio": 5
+  },
+  "n_runs": 11
+}

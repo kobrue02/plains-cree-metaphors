@@ -34,12 +34,13 @@ OUTPUT_FULL  = "data/figurative/eval_validation_full.csv"
 OUTPUT_GOLD  = "data/figurative/eval_validation_gold.csv"
 
 MODELS = [
-    ("XLM-R base",          "KonradBRG/xlm-r-plains-cree-en-tlm-figurative"),
-    ("XLM-MLM CLKD f12",    "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12"),
-    ("XLM-MLM CLKD full",   "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full"),
-    ("Glot500 CLKD direct", "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
-    ("Glot500 CLKD + TLM",  "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
-    ("XLM-V CLKD direct",   "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
+    ("XLM-R base",            "KonradBRG/xlm-r-plains-cree-en-tlm-figurative"),
+    ("XLM-MLM CLKD f12",      "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12"),
+    ("XLM-MLM CLKD full",     "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full"),
+    ("Glot500 CLKD direct",   "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
+    ("Glot500 CLKD + TLM",    "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
+    ("XLM-V CLKD direct",     "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
+    ("XLM-MLM calibrated",    "KonradBRG/xlm-mlm-plains-cree-en-calibrated"),
 ]
 
 
