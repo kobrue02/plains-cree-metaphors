@@ -1,13 +1,26 @@
-# Please install OpenAI SDK first: `pip3 install openai`
 import os
+from pathlib import Path
 from openai import OpenAI
 
-API_KEY = "sk-74cfbb585ec54655ad3de5e54b5adeb5"
 MODEL_ID = "deepseek-v4-pro"
 
-client = OpenAI(
-    api_key=API_KEY,
-    base_url="https://api.deepseek.com")
+
+def _load_api_key() -> str:
+    if key := os.environ.get("DEEPSEEK_API_KEY"):
+        return key
+    # Walk up from this file to find a .env
+    for directory in [Path(__file__).parent, *Path(__file__).parents]:
+        env_file = directory / ".env"
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                if line.startswith("DEEPSEEK_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    raise RuntimeError(
+        "DEEPSEEK_API_KEY not found. Set it in the environment or in a .env file."
+    )
+
+
+client = OpenAI(api_key=_load_api_key(), base_url="https://api.deepseek.com")
 
 def call_deepseek(prompt: str) -> tuple[str, str]:
     response = client.chat.completions.create(
