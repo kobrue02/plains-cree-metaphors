@@ -71,7 +71,7 @@ def main() -> None:
     args = p.parse_args()
 
     idioms = load_idioms(IDIOMS_FILE)
-    print(f"Loaded {len(idioms)} idioms (above {MIN_PHRASE_LEN}-char threshold)\n")
+    print(f"Loaded {len(idioms)} idioms\n")
 
     if not os.path.exists(args.pool):
         sys.exit(f"Pool file not found: {args.pool}\nRun 'scripts/active_loop.py infer' first.")
