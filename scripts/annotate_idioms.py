@@ -18,10 +18,6 @@ POOL_FILE    = "data/figurative/active_pool.csv"
 ANNOT_FILE   = "data/figurative/bloomfield_annotated.csv"
 ACTIVE_ANNOT = "data/figurative/active_annotations.csv"
 
-# Idioms shorter than this many characters are too risky to match
-# (common particles that appear in non-idiomatic contexts)
-MIN_PHRASE_LEN = 10
-
 
 def load_idioms(path: str) -> list[tuple[str, str]]:
     """Return list of (cree_phrase, english_meaning) from idioms.txt."""
@@ -34,10 +30,7 @@ def load_idioms(path: str) -> list[tuple[str, str]]:
             cree, english = line.split("|||", 1)
             cree    = cree.strip()
             english = english.strip()
-            if len(cree) >= MIN_PHRASE_LEN:
-                idioms.append((cree, english))
-            else:
-                print(f"  [skip] too short to match safely: {cree!r}")
+            idioms.append((cree, english))
     return idioms
 
 
