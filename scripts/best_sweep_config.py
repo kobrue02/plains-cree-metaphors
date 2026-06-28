@@ -28,7 +28,7 @@ STAGE_FLAGS = {
     "clkd": {
         "learning_rate":   "--clkd-lr",
         "epochs":          "--clkd-epochs",
-        "temperature":     None,          # not yet a pipeline flag
+        "temperature":     "--clkd-temperature",
         "freeze_n_layers": "--freeze-layers",
     },
     "tlm": {

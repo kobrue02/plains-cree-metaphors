@@ -41,6 +41,7 @@ MODELS = [
     ("Glot500 CLKD + TLM",    "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
     ("XLM-V CLKD direct",     "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
     ("XLM-MLM calibrated",    "KonradBRG/xlm-mlm-plains-cree-en-calibrated"),
+    ("XLM-V calibrated",      "KonradBRG/xlm-v-plains-cree-en-calibrated"),
 ]
 
 

@@ -83,6 +83,7 @@ def main() -> None:
     # CLKD
     p.add_argument("--clkd-epochs",      type=int,   default=10)
     p.add_argument("--clkd-lr",          type=float, default=5e-6)
+    p.add_argument("--clkd-temperature", type=float, default=2.0)
     p.add_argument("--freeze-layers",    type=int,   default=0)
     p.add_argument("--teacher",          default=TEACHER)
     p.add_argument("--corpus-file",      default="data/bloomfield_texts_sentences.csv")
@@ -143,6 +144,7 @@ def main() -> None:
             epochs=args.clkd_epochs,
             batch_size=args.batch_size,
             learning_rate=args.clkd_lr,
+            temperature=args.clkd_temperature,
             output_dir=clkd_local,
             hub_model_id=clkd_hub if args.push_intermediates else None,
             wandb_project=args.wandb_project,
