@@ -23,7 +23,7 @@ Usage
 """
 
 from __future__ import annotations
-import os, sys, argparse, json, tempfile
+import os, sys, argparse, tempfile
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import pandas as pd
@@ -147,11 +147,9 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     import wandb
     from src.scrapers.scrape_itwewina import lookup_sentence, format_for_prompt
 
-    # Queue: low-conf OR high-conf figurative (worth confirming)
-    queue = pool[
-        (pool["confidence"] < LOW_CONF) |
-        ((pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal"))
-    ].copy()
+    # Queue: only low-confidence sentences — high-conf figurative go straight to
+    # pseudo-labels in phase_retrain and should not be second-guessed by DeepSeek
+    queue = pool[pool["confidence"] < LOW_CONF].copy()
 
     # Skip already-annotated
     done_texts: set[str] = set()
