@@ -36,7 +36,7 @@ command:
   - --stage
   - calibrate
   - --clkd-ckpt
-  - KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full
+  - KonradBRG/xlm-mlm-plains-cree-en-clkd
   - --output-dir
   - data/sweep_calibrate_trial
   - --batch-size
