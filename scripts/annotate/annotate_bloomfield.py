@@ -14,7 +14,7 @@ Resume-safe: progress is checkpointed to data/figurative/annotation_cache.jsonl
 
 from __future__ import annotations
 import os, sys, json, time, re, argparse
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import pandas as pd
 from src.annotate.deepseek import client, MODEL_ID

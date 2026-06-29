@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 
 BLOOMFIELD_CSV  = "data/bloomfield_texts.csv"
@@ -62,7 +62,7 @@ def build_okimasis() -> int:
     import subprocess, sys
     print("\nExtracting Okimāsis textbook pairs ...")
     result = subprocess.run(
-        [sys.executable, "scripts/scrape_okimasis.py",
+        [sys.executable, "scripts/data/scrape_okimasis.py",
          "--pdf", OKIMASIS_PDF, "--out", OKIMASIS_OUT],
         capture_output=True, text=True,
     )
@@ -77,7 +77,7 @@ def build_bloomfield_1930() -> int:
     import subprocess, sys
     print("\nExtracting Bloomfield (1930) paragraph pairs ...")
     result = subprocess.run(
-        [sys.executable, "scripts/scrape_bloomfield_1930.py",
+        [sys.executable, "scripts/data/scrape_bloomfield_1930.py",
          "--pdf", BLOOMFIELD_1930_PDF, "--out", BLOOMFIELD_1930_OUT],
         capture_output=True, text=True,
     )

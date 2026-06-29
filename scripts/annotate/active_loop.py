@@ -24,7 +24,7 @@ Usage
 
 from __future__ import annotations
 import os, sys, argparse, tempfile
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import pandas as pd
 

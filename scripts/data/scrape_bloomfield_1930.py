@@ -64,10 +64,12 @@ def _clean_para(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
-def _is_real_para(text: str, min_alpha_ratio: float = 0.40) -> bool:
-    """Return False for OCR-garbage paragraphs (mostly punctuation/whitespace)."""
+def _is_real_para(text: str, min_alpha_ratio: float = 0.40, min_words: int = 5) -> bool:
+    """Return False for OCR-garbage or fragment paragraphs."""
     alpha = sum(1 for c in text if c.isalpha())
-    return len(text) >= 15 and alpha / max(len(text), 1) >= min_alpha_ratio
+    if len(text) < 20 or alpha / max(len(text), 1) < min_alpha_ratio:
+        return False
+    return len(text.split()) >= min_words
 
 
 def _split_paragraphs(text: str) -> list[str]:
@@ -128,8 +130,13 @@ def extract_stories(full_text: str) -> list[dict]:
         # Find where English translation begins
         split_idx = _find_en_split(paragraphs)
 
-        cree_paras = [_clean_para(p) for p in paragraphs[:split_idx]]
-        en_paras   = [_clean_para(p) for p in paragraphs[split_idx:]]
+        # Cree section: also drop paragraphs that are actually English
+        # (editorial notes, translator comments embedded in the Cree block)
+        cree_paras = [
+            _clean_para(p) for p in paragraphs[:split_idx]
+            if not _is_english_para(p)
+        ]
+        en_paras = [_clean_para(p) for p in paragraphs[split_idx:]]
 
         stories.append({
             "number":     num,
@@ -158,14 +165,30 @@ def _find_en_split(paragraphs: list[str]) -> int:
     return len(paragraphs)  # all Cree (shouldn't happen)
 
 
-def align_pairs(stories: list[dict]) -> list[tuple[str, str]]:
-    """Align Cree and English paragraphs 1:1 by position within each story."""
+def align_pairs(
+    stories: list[dict],
+    max_para_diff: int = 6,
+) -> list[tuple[str, str]]:
+    """
+    Align Cree and English paragraphs 1:1 by position within each story.
+
+    Only stories where abs(len(cree) - len(en)) <= max_para_diff are included;
+    beyond that threshold, proportional merging produces wrong-content pairs
+    because the Cree splits each dialogue line into its own paragraph while the
+    English merges them.
+    """
     pairs = []
     for story in stories:
         cree = story["cree_paras"]
         en   = story["en_paras"]
+        if not cree or not en:
+            continue
+        if abs(len(cree) - len(en)) > max_para_diff:
+            continue
         for c, e in zip(cree, en):
-            if len(c) >= 15 and len(e) >= 15:
+            c = re.sub(r"\s+", " ", c).strip()
+            e = re.sub(r"\s+", " ", e).strip()
+            if _is_real_para(c) and _is_real_para(e):
                 pairs.append((c, e))
     return pairs
 
@@ -197,6 +220,12 @@ def main() -> None:
         action="store_true",
         help="Print per-story paragraph counts for alignment diagnostics",
     )
+    p.add_argument(
+        "--max-para-diff",
+        type=int,
+        default=6,
+        help="Only include stories where |cree_paras - en_paras| <= this (default: 6)",
+    )
     args = p.parse_args()
 
     if not os.path.exists(args.pdf):
@@ -215,16 +244,17 @@ def main() -> None:
     print(f"  Found {len(stories)} stories")
 
     if args.stats:
-        print(f"\n{'#':<4} {'Title':<50} {'Cree':>5} {'EN':>5}")
-        print("─" * 70)
+        print(f"\n{'#':<4} {'Title':<50} {'Cree':>5} {'EN':>5} {'use?':>5}")
+        print("─" * 76)
         for s in stories:
-            nc = len(s["cree_paras"])
-            ne = len(s["en_paras"])
-            flag = " !" if abs(nc - ne) > 3 else ""
-            print(f"({s['number']:<2}) {s['title'][:48]:<48}  {nc:>4}  {ne:>4}{flag}")
+            nc   = len(s["cree_paras"])
+            ne   = len(s["en_paras"])
+            diff = abs(nc - ne)
+            use  = "yes" if diff <= args.max_para_diff else "skip"
+            print(f"({s['number']:<2}) {s['title'][:48]:<48}  {nc:>4}  {ne:>4}  {use}")
         print()
 
-    pairs = align_pairs(stories)
+    pairs = align_pairs(stories, max_para_diff=args.max_para_diff)
     pairs = dedup(pairs)
 
     os.makedirs(os.path.dirname(args.out) if os.path.dirname(args.out) else ".", exist_ok=True)

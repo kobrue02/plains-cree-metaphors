@@ -51,7 +51,7 @@ mkdir -p logs
 
 # 5. Run
 echo "Starting active annotation loop with args: $@"
-python3 scripts/active_loop.py "$@"
+python3 scripts/annotate/active_loop.py "$@"
 
 if [ $? -eq 0 ]; then
     echo "Active loop complete."
