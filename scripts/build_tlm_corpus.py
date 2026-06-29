@@ -5,11 +5,13 @@ Output files:
   data/sentences_bloomfield.txt   — Plains Cree-English (Bloomfield 1934)
   data/sentences_edtekla.txt      — Plains Cree-English (Teodorescu et al. 2022)
   data/sentences_ojibwe.txt       — Ojibwe-English (Jones & Michelson 1917)
-  data/sentences_combined.txt     — all three concatenated
+  data/sentences_okimasis.txt     — Plains Cree-English (Okimāsis 2018 textbook)
+  data/sentences_combined.txt     — all four concatenated
 
 Usage:
   python scripts/build_tlm_corpus.py
   python scripts/build_tlm_corpus.py --skip-bloomfield   # if CSV already exists
+  python scripts/build_tlm_corpus.py --skip-okimasis     # skip PDF extraction
 """
 
 from __future__ import annotations
@@ -25,6 +27,8 @@ EDTEKLA_OUT     = "data/sentences_edtekla.txt"
 OJIBWE_TXT      = "data/ojibwatextscoll07jonerich_djvu.txt"
 OJIBWE_CSV      = "data/ojibwe_texts_aligned.csv"
 OJIBWE_OUT      = "data/sentences_ojibwe.txt"
+OKIMASIS_PDF    = "data/creelanguageoftheplainstextbook.pdf"
+OKIMASIS_OUT    = "data/sentences_okimasis.txt"
 COMBINED_OUT    = "data/sentences_combined.txt"
 
 
@@ -48,6 +52,21 @@ def build_edtekla() -> int:
     print("\nScraping EdTeKLA corpus ...")
     pairs = EdTeKLAScraper().scrape(output=EDTEKLA_OUT)
     return len(pairs)
+
+
+def build_okimasis() -> int:
+    import subprocess, sys
+    print("\nExtracting Okimāsis textbook pairs ...")
+    result = subprocess.run(
+        [sys.executable, "scripts/scrape_okimasis.py",
+         "--pdf", OKIMASIS_PDF, "--out", OKIMASIS_OUT],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"  WARNING: scrape_okimasis.py failed: {result.stderr.strip()}")
+        return 0
+    print(result.stdout.strip())
+    return sum(1 for _ in open(OKIMASIS_OUT))
 
 
 def build_ojibwe() -> int:
@@ -78,6 +97,7 @@ def main() -> None:
                    help=f"Skip re-scraping; use existing {BLOOMFIELD_CSV}")
     p.add_argument("--skip-edtekla",   action="store_true")
     p.add_argument("--skip-ojibwe",    action="store_true")
+    p.add_argument("--skip-okimasis",  action="store_true")
     args = p.parse_args()
 
     counts = {}
@@ -100,13 +120,24 @@ def main() -> None:
         counts["ojibwe"] = sum(1 for _ in open(OJIBWE_OUT))
         print(f"Ojibwe: using existing {OJIBWE_OUT} ({counts['ojibwe']:,} pairs)")
 
-    total = concatenate([BLOOMFIELD_OUT, EDTEKLA_OUT, OJIBWE_OUT], COMBINED_OUT)
+    if not args.skip_okimasis:
+        counts["okimasis"] = build_okimasis()
+    else:
+        counts["okimasis"] = sum(1 for _ in open(OKIMASIS_OUT)) if os.path.exists(OKIMASIS_OUT) else 0
+        print(f"Okimāsis: using existing {OKIMASIS_OUT} ({counts['okimasis']:,} pairs)")
+
+    sources = [BLOOMFIELD_OUT, EDTEKLA_OUT, OJIBWE_OUT]
+    if counts.get("okimasis", 0) > 0 and os.path.exists(OKIMASIS_OUT):
+        sources.append(OKIMASIS_OUT)
+
+    total = concatenate(sources, COMBINED_OUT)
     counts["combined"] = total
 
     print(f"\n{'─'*50}")
     print(f"  Bloomfield (1934)          {counts['bloomfield']:>6,}")
     print(f"  EdTeKLA / Teodorescu 2022  {counts['edtekla']:>6,}")
     print(f"  Ojibwe / Jones 1917        {counts['ojibwe']:>6,}")
+    print(f"  Okimāsis (2018)            {counts.get('okimasis', 0):>6,}")
     print(f"  {'─'*30}")
     print(f"  Combined                   {counts['combined']:>6,}")
     print(f"  → {COMBINED_OUT}")
