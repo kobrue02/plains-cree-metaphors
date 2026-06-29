@@ -1,8 +1,9 @@
 """
 Regenerate all TLM training data sources and consolidate into a single parquet file.
 
-Output file:
-  data/sentences.parquet   — columns: text_cree, text_en, source
+Output files:
+  data/sentences.parquet                 — columns: text_cree, text_en, source
+  data/bloomfield_texts_sentences.parquet — Bloomfield 1934 sentence pool (CLKD + active loop)
     source values:
       "bloomfield_1934"   — Plains Cree-English (Bloomfield 1934)
       "edtekla"           — Plains Cree-English (Teodorescu et al. 2022)
@@ -25,11 +26,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 import pandas as pd
 
-BLOOMFIELD_CSV  = "data/bloomfield_texts.parquet"
-OJIBWE_TXT      = "data/ojibwatextscoll07jonerich_djvu.txt"
-OKIMASIS_PDF       = "data/creelanguageoftheplainstextbook.pdf"
+BLOOMFIELD_CSV   = "data/bloomfield_texts.parquet"
+BLOOMFIELD_SENTS = "data/bloomfield_texts_sentences.parquet"
+OJIBWE_TXT       = "data/ojibwatextscoll07jonerich_djvu.txt"
+OKIMASIS_PDF        = "data/creelanguageoftheplainstextbook.pdf"
 BLOOMFIELD_1930_PDF = "data/sacred-stories-bloomfield-1930.pdf"
-SENTENCES_OUT      = "data/sentences.parquet"
+SENTENCES_OUT       = "data/sentences.parquet"
 
 # Internal temp paths used by subprocess-based scrapers (not exported constants)
 _OKIMASIS_OUT       = "data/sentences_okimasis.txt"
@@ -47,7 +49,9 @@ def build_bloomfield_df(skip_scrape: bool = False) -> pd.DataFrame:
     df = pd.read_parquet(BLOOMFIELD_CSV)
     splitter = ParallelSentenceSplitter(df)
     sent_df = splitter.split()
-    # split() returns: paragraph_id, sentence_id, text_cree, text_en, confidence
+    # Write sentence pool used by CLKD and the active annotation loop
+    sent_df.to_parquet(BLOOMFIELD_SENTS, index=False)
+    print(f"  → {BLOOMFIELD_SENTS} ({len(sent_df):,} sentences)")
     result = sent_df[["text_cree", "text_en"]].copy()
     result["source"] = "bloomfield_1934"
     return result
