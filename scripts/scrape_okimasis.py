@@ -22,7 +22,7 @@ Usage:
 """
 
 from __future__ import annotations
-import argparse, re, subprocess, sys, os
+import argparse, re, sys, os
 
 # SRO macron vowels used in this textbook
 _CREE_RE  = re.compile(r"[āēīōĀĒĪŌ]")
@@ -175,15 +175,17 @@ def main() -> None:
         sys.exit(f"PDF not found: {args.pdf}")
 
     print(f"Extracting text from {args.pdf} ...")
-    result = subprocess.run(
-        ["pdftotext", "-layout", args.pdf, "-"],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-    )
-    if result.returncode != 0:
-        sys.exit(f"pdftotext failed: {result.stderr}")
+    try:
+        import fitz  # pymupdf
+        doc  = fitz.open(args.pdf)
+        text = "\n".join(
+            page.get_text("text", sort=True) for page in doc
+        )
+    except ImportError:
+        sys.exit("pymupdf not installed — run: uv sync")
 
     print("Parsing parallel pairs ...")
-    pairs = extract_pairs(result.stdout)
+    pairs = extract_pairs(text)
     pairs = dedup(pairs)
 
     # Filter junk

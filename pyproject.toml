@@ -23,4 +23,5 @@ dependencies = [
     "sacremoses>=0.1.1",
     "sentencepiece>=0.2.0",
     "tiktoken>=0.13.0",
+    "pymupdf>=1.24.0",
 ]
