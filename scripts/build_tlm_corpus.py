@@ -2,16 +2,18 @@
 Regenerate all TLM training data sources as separate files, then concatenate.
 
 Output files:
-  data/sentences_bloomfield.txt   — Plains Cree-English (Bloomfield 1934)
-  data/sentences_edtekla.txt      — Plains Cree-English (Teodorescu et al. 2022)
-  data/sentences_ojibwe.txt       — Ojibwe-English (Jones & Michelson 1917)
-  data/sentences_okimasis.txt     — Plains Cree-English (Okimāsis 2018 textbook)
-  data/sentences_combined.txt     — all four concatenated
+  data/sentences_bloomfield.txt      — Plains Cree-English (Bloomfield 1934)
+  data/sentences_edtekla.txt         — Plains Cree-English (Teodorescu et al. 2022)
+  data/sentences_ojibwe.txt          — Ojibwe-English (Jones & Michelson 1917)
+  data/sentences_okimasis.txt        — Plains Cree-English (Okimāsis 2018 textbook)
+  data/sentences_bloomfield_1930.txt — Plains Cree-English (Bloomfield 1930, paragraph-aligned)
+  data/sentences_combined.txt        — all five concatenated
 
 Usage:
   python scripts/build_tlm_corpus.py
   python scripts/build_tlm_corpus.py --skip-bloomfield   # if CSV already exists
   python scripts/build_tlm_corpus.py --skip-okimasis     # skip PDF extraction
+  python scripts/build_tlm_corpus.py --skip-bloomfield-1930
 """
 
 from __future__ import annotations
@@ -27,9 +29,11 @@ EDTEKLA_OUT     = "data/sentences_edtekla.txt"
 OJIBWE_TXT      = "data/ojibwatextscoll07jonerich_djvu.txt"
 OJIBWE_CSV      = "data/ojibwe_texts_aligned.csv"
 OJIBWE_OUT      = "data/sentences_ojibwe.txt"
-OKIMASIS_PDF    = "data/creelanguageoftheplainstextbook.pdf"
-OKIMASIS_OUT    = "data/sentences_okimasis.txt"
-COMBINED_OUT    = "data/sentences_combined.txt"
+OKIMASIS_PDF       = "data/creelanguageoftheplainstextbook.pdf"
+OKIMASIS_OUT       = "data/sentences_okimasis.txt"
+BLOOMFIELD_1930_PDF = "data/sacred-stories-bloomfield-1930.pdf"
+BLOOMFIELD_1930_OUT = "data/sentences_bloomfield_1930.txt"
+COMBINED_OUT       = "data/sentences_combined.txt"
 
 
 def build_bloomfield(skip_scrape: bool = False) -> int:
@@ -69,6 +73,21 @@ def build_okimasis() -> int:
     return sum(1 for _ in open(OKIMASIS_OUT))
 
 
+def build_bloomfield_1930() -> int:
+    import subprocess, sys
+    print("\nExtracting Bloomfield (1930) paragraph pairs ...")
+    result = subprocess.run(
+        [sys.executable, "scripts/scrape_bloomfield_1930.py",
+         "--pdf", BLOOMFIELD_1930_PDF, "--out", BLOOMFIELD_1930_OUT],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        print(f"  WARNING: scrape_bloomfield_1930.py failed: {result.stderr.strip()}")
+        return 0
+    print(result.stdout.strip())
+    return sum(1 for _ in open(BLOOMFIELD_1930_OUT))
+
+
 def build_ojibwe() -> int:
     from src.scrapers.scrape_ojibwe import parse, to_csv, to_parallel
     print("\nParsing Ojibwe texts ...")
@@ -95,9 +114,10 @@ def main() -> None:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--skip-bloomfield-scrape", action="store_true",
                    help=f"Skip re-scraping; use existing {BLOOMFIELD_CSV}")
-    p.add_argument("--skip-edtekla",   action="store_true")
-    p.add_argument("--skip-ojibwe",    action="store_true")
-    p.add_argument("--skip-okimasis",  action="store_true")
+    p.add_argument("--skip-edtekla",          action="store_true")
+    p.add_argument("--skip-ojibwe",           action="store_true")
+    p.add_argument("--skip-okimasis",         action="store_true")
+    p.add_argument("--skip-bloomfield-1930",  action="store_true")
     args = p.parse_args()
 
     counts = {}
@@ -126,9 +146,24 @@ def main() -> None:
         counts["okimasis"] = sum(1 for _ in open(OKIMASIS_OUT)) if os.path.exists(OKIMASIS_OUT) else 0
         print(f"Okimāsis: using existing {OKIMASIS_OUT} ({counts['okimasis']:,} pairs)")
 
+    if not args.skip_bloomfield_1930:
+        if os.path.exists(BLOOMFIELD_1930_PDF):
+            counts["bloomfield_1930"] = build_bloomfield_1930()
+        else:
+            counts["bloomfield_1930"] = 0
+            print(f"Bloomfield 1930: PDF not found at {BLOOMFIELD_1930_PDF}, skipping")
+    else:
+        counts["bloomfield_1930"] = (
+            sum(1 for _ in open(BLOOMFIELD_1930_OUT))
+            if os.path.exists(BLOOMFIELD_1930_OUT) else 0
+        )
+        print(f"Bloomfield 1930: using existing {BLOOMFIELD_1930_OUT} ({counts['bloomfield_1930']:,} pairs)")
+
     sources = [BLOOMFIELD_OUT, EDTEKLA_OUT, OJIBWE_OUT]
     if counts.get("okimasis", 0) > 0 and os.path.exists(OKIMASIS_OUT):
         sources.append(OKIMASIS_OUT)
+    if counts.get("bloomfield_1930", 0) > 0 and os.path.exists(BLOOMFIELD_1930_OUT):
+        sources.append(BLOOMFIELD_1930_OUT)
 
     total = concatenate(sources, COMBINED_OUT)
     counts["combined"] = total
@@ -138,6 +173,7 @@ def main() -> None:
     print(f"  EdTeKLA / Teodorescu 2022  {counts['edtekla']:>6,}")
     print(f"  Ojibwe / Jones 1917        {counts['ojibwe']:>6,}")
     print(f"  Okimāsis (2018)            {counts.get('okimasis', 0):>6,}")
+    print(f"  Bloomfield (1930)          {counts.get('bloomfield_1930', 0):>6,}")
     print(f"  {'─'*30}")
     print(f"  Combined                   {counts['combined']:>6,}")
     print(f"  → {COMBINED_OUT}")
