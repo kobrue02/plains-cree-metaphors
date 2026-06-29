@@ -19,9 +19,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 from src.annotate.deepseek import client, MODEL_ID
 
-TEXTS_CSV   = "data/bloomfield_texts.csv"
-SENTS_CSV   = "data/bloomfield_texts_sentences.csv"
-OUTPUT_CSV  = "data/figurative/bloomfield_annotated.csv"
+TEXTS_CSV   = "data/bloomfield_texts.parquet"
+SENTS_CSV   = "data/bloomfield_texts_sentences.parquet"
+OUTPUT_CSV  = "data/figurative/bloomfield_annotated.parquet"
 CACHE_JSONL = "data/figurative/annotation_cache.jsonl"
 
 LABEL_MAP = {
@@ -143,8 +143,8 @@ def save_to_cache(paragraph_id: int, annotations: list[dict]) -> None:
 def main(limit: int | None = None) -> None:
     os.makedirs("data/figurative", exist_ok=True)
 
-    texts = pd.read_csv(TEXTS_CSV, encoding="utf-8-sig").reset_index(drop=True)
-    sents = pd.read_csv(SENTS_CSV, encoding="utf-8-sig")
+    texts = pd.read_parquet(TEXTS_CSV).reset_index(drop=True)
+    sents = pd.read_parquet(SENTS_CSV)
 
     has_fn = texts["footnote_en"].notna() & (texts["footnote_en"].str.strip() != "")
     footnoted = texts[has_fn]
@@ -208,7 +208,7 @@ def main(limit: int | None = None) -> None:
             })
 
     out = pd.DataFrame(rows_out)
-    out.to_csv(OUTPUT_CSV, index=False, encoding="utf-8-sig")
+    out.to_parquet(OUTPUT_CSV, index=False)
 
     print(f"\nDone.  {len(out)} sentences  |  {n_api} new API calls")
     print(f"Label distribution:\n{out['label'].value_counts().to_string()}")

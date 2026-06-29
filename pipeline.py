@@ -33,7 +33,7 @@ from funcs import fine_tune, figurative_distill, calibrate
 
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
 SENTENCES_FILE = "data/sentences_combined.txt"
-ANNOT_FILE     = "data/figurative/bloomfield_annotated.csv"
+ANNOT_FILE     = "data/figurative/bloomfield_annotated.parquet"
 
 
 def hub_id(prefix: str, model_id: str, stage: str) -> str:
@@ -86,7 +86,7 @@ def main() -> None:
     p.add_argument("--clkd-temperature", type=float, default=2.0)
     p.add_argument("--freeze-layers",    type=int,   default=0)
     p.add_argument("--teacher",          default=TEACHER)
-    p.add_argument("--corpus-file",      default="data/bloomfield_texts_sentences.csv")
+    p.add_argument("--corpus-file",      default="data/bloomfield_texts_sentences.parquet")
 
     # Calibration
     p.add_argument("--calibrate-epochs", type=int,   default=10)

@@ -21,7 +21,7 @@ import pandas as pd
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-CORPUS_FILE   = "data/bloomfield_texts_sentences.csv"
+CORPUS_FILE   = "data/bloomfield_texts_sentences.parquet"
 OUTPUT_FILE   = "data/figurative/eval_simile_detection.csv"
 DETAIL_FILE   = "data/figurative/eval_simile_detection_detail.csv"
 
@@ -40,7 +40,7 @@ MODELS = [
     ("XLM-V CLKD + TLM",                 "KonradBRG/xlm-v-base-plains-cree-en-clkd-tlm"),
 ]
 
-df = pd.read_csv(CORPUS_FILE, encoding="utf-8-sig").dropna(subset=["text_cree"])
+df = pd.read_parquet(CORPUS_FILE).dropna(subset=["text_cree"])
 simile_df = df[df["text_cree"].str.contains(SIMILE_RE, na=False)].reset_index(drop=True)
 other_df  = df[~df["text_cree"].str.contains(SIMILE_RE, na=False)].reset_index(drop=True)
 

@@ -29,7 +29,7 @@ from sklearn.metrics import classification_report, f1_score
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-ANNOT_FILE   = "data/figurative/bloomfield_annotated.csv"
+ANNOT_FILE   = "data/figurative/bloomfield_annotated.parquet"
 OUTPUT_FULL  = "data/figurative/eval_validation_full.csv"
 OUTPUT_GOLD  = "data/figurative/eval_validation_gold.csv"
 
@@ -90,7 +90,7 @@ def evaluate(df: pd.DataFrame, subset_name: str) -> list[dict]:
 
 
 def main() -> None:
-    annot = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
+    annot = pd.read_parquet(ANNOT_FILE)
     annot = annot.dropna(subset=["text_cree", "label"])
     # normalise label column (in case of stray whitespace)
     annot["label"] = annot["label"].str.strip().str.lower().map(

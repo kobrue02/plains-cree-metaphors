@@ -12,8 +12,8 @@ class BloomfieldScraper:
     _session = requests.Session()
     _session.headers["User-Agent"] = "Mozilla/5.0 (academic scraper)"
 
-    def scrape(self, output: str = "bloomfield_texts.csv") -> pd.DataFrame:
-        """Main driver: fetch all texts and write to CSV."""
+    def scrape(self, output: str = "bloomfield_texts.parquet") -> pd.DataFrame:
+        """Main driver: fetch all texts and write to parquet."""
         print("Fetching index page...")
         index_soup = self._fetch(self.INDEX_URL)
         links = self._get_text_links(index_soup)
@@ -33,7 +33,7 @@ class BloomfieldScraper:
 
         cols = ["source_file", "paragraph_num", "text_cree", "text_en", "footnote_en"]
         df = pd.DataFrame(all_rows, columns=cols)
-        df.to_csv(output, index=False, encoding="utf-8-sig")
+        df.to_parquet(output, index=False)
         print(f"\nDone. {len(df)} total paragraphs written to {output}.")
         return df
 
@@ -151,4 +151,4 @@ class BloomfieldScraper:
 
 
 if __name__ == "__main__":
-    BloomfieldScraper().scrape()
+    BloomfieldScraper().scrape(output="bloomfield_texts.parquet")

@@ -18,7 +18,7 @@ import pandas as pd
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-CORPUS_FILE = "data/bloomfield_texts_sentences.csv"
+CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
 OUTPUT_FILE = "data/figurative/eval_figurative_rate.csv"
 
 MODELS = [
@@ -33,7 +33,7 @@ MODELS = [
     ("XLM-V CLKD + TLM",                 "KonradBRG/xlm-v-base-plains-cree-en-clkd-tlm"),
 ]
 
-df = pd.read_csv(CORPUS_FILE, encoding="utf-8-sig").dropna(subset=["text_cree"])
+df = pd.read_parquet(CORPUS_FILE).dropna(subset=["text_cree"])
 cree_texts = df["text_cree"].tolist()
 print(f"Corpus: {len(cree_texts):,} Cree sentences")
 

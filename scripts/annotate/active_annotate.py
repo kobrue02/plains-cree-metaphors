@@ -30,10 +30,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 CALIBRATED_MODEL = "KonradBRG/xlm-mlm-plains-cree-en-calibrated"
-ANNOT_FILE       = "data/figurative/bloomfield_annotated.csv"
-POOL_FILE        = "data/bloomfield_texts_sentences.csv"
-ACTIVE_POOL      = "data/figurative/active_pool.csv"
-ACTIVE_ANNOT     = "data/figurative/active_annotations.csv"
+ANNOT_FILE       = "data/figurative/bloomfield_annotated.parquet"
+POOL_FILE        = "data/bloomfield_texts_sentences.parquet"
+ACTIVE_POOL      = "data/figurative/active_pool.parquet"
+ACTIVE_ANNOT     = "data/figurative/active_annotations.parquet"
 LABELS           = ["literal", "idiom", "metaphor", "simile"]
 
 # Confidence thresholds
@@ -48,11 +48,11 @@ def cmd_infer(args) -> None:
     from src.figurative.predict import load_model, predict_sentences
 
     # Load already-annotated sentence texts to exclude
-    annotated = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
+    annotated = pd.read_parquet(ANNOT_FILE)
     known_texts = set(annotated["text_cree"].dropna().str.strip().tolist())
 
     # Load full pool
-    pool = pd.read_csv(POOL_FILE, encoding="utf-8-sig")
+    pool = pd.read_parquet(POOL_FILE)
     pool = pool.dropna(subset=["text_cree", "text_en"])
     pool["text_cree"] = pool["text_cree"].str.strip()
 
@@ -76,7 +76,7 @@ def cmd_infer(args) -> None:
         df[key] = [p[key] for p in preds]
 
     os.makedirs(os.path.dirname(ACTIVE_POOL), exist_ok=True)
-    df.to_csv(ACTIVE_POOL, index=False, encoding="utf-8-sig")
+    df.to_parquet(ACTIVE_POOL, index=False)
 
     # Summary
     high_fig = df[(df["confidence"] >= HIGH_CONF) & (df["label"] != "literal")]
@@ -152,12 +152,12 @@ def cmd_annotate(args) -> None:
     if not os.path.exists(ACTIVE_POOL):
         sys.exit(f"Run 'infer' first — {ACTIVE_POOL} not found.")
 
-    pool = pd.read_csv(ACTIVE_POOL, encoding="utf-8-sig")
+    pool = pd.read_parquet(ACTIVE_POOL)
 
     # Load existing active annotations to skip already-done ones
     done_texts: set[str] = set()
     if os.path.exists(ACTIVE_ANNOT):
-        done = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+        done = pd.read_parquet(ACTIVE_ANNOT)
         done_texts = set(done["text_cree"].dropna().str.strip().tolist())
 
     # Build annotation queue: low confidence OR high-conf figurative
@@ -209,9 +209,9 @@ def cmd_annotate(args) -> None:
     # Append to active annotations file
     new_df = pd.DataFrame(annotated_rows)
     if os.path.exists(ACTIVE_ANNOT):
-        existing = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+        existing = pd.read_parquet(ACTIVE_ANNOT)
         new_df = pd.concat([existing, new_df], ignore_index=True)
-    new_df.to_csv(ACTIVE_ANNOT, index=False, encoding="utf-8-sig")
+    new_df.to_parquet(ACTIVE_ANNOT, index=False)
     print(f"\nSaved {len(annotated_rows)} annotations → {ACTIVE_ANNOT}")
     label_dist = pd.Series([r["label"] for r in annotated_rows]).value_counts()
     print(f"Distribution: {label_dist.to_dict()}")
@@ -224,16 +224,16 @@ def cmd_retrain(args) -> None:
     from funcs import calibrate
 
     # Load gold labels
-    gold = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
+    gold = pd.read_parquet(ANNOT_FILE)
 
     # Load active annotations
     if not os.path.exists(ACTIVE_ANNOT):
         sys.exit(f"No active annotations found at {ACTIVE_ANNOT}. Run 'annotate' first.")
-    active = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+    active = pd.read_parquet(ACTIVE_ANNOT)
 
     # Optionally also add high-confidence pseudo-labels
     if os.path.exists(ACTIVE_POOL):
-        pool = pd.read_csv(ACTIVE_POOL, encoding="utf-8-sig")
+        pool = pd.read_parquet(ACTIVE_POOL)
         pseudo = pool[
             (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
         ][["text_cree", "text_en", "label"]].copy()
@@ -254,10 +254,9 @@ def cmd_retrain(args) -> None:
     print(f"Label dist: {combined['label'].value_counts().to_dict()}")
 
     # Write merged annotation file to temp location
-    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w",
-                                      encoding="utf-8-sig", newline="")
-    combined.to_csv(tmp.name, index=False)
+    tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp.close()
+    combined.to_parquet(tmp.name, index=False)
 
     print(f"\nRetraining calibration from {args.checkpoint} ...")
     calibrate(
@@ -278,19 +277,19 @@ def cmd_retrain(args) -> None:
 # ── 4. STATUS ─────────────────────────────────────────────────────────────────
 
 def cmd_status(_args) -> None:
-    gold_n = len(pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")) \
+    gold_n = len(pd.read_parquet(ANNOT_FILE)) \
         if os.path.exists(ANNOT_FILE) else 0
 
     pool_n = annot_n = pseudo_n = queue_n = 0
     if os.path.exists(ACTIVE_POOL):
-        pool = pd.read_csv(ACTIVE_POOL, encoding="utf-8-sig")
+        pool = pd.read_parquet(ACTIVE_POOL)
         pool_n  = len(pool)
         queue_n = len(pool[pool["confidence"] < LOW_CONF])
         pseudo_n = len(pool[
             (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
         ])
     if os.path.exists(ACTIVE_ANNOT):
-        annot_n = len(pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig"))
+        annot_n = len(pd.read_parquet(ACTIVE_ANNOT))
 
     print(f"Gold annotations        : {gold_n:>5,}  ({ANNOT_FILE})")
     print(f"Unlabeled pool (inferred): {pool_n:>5,}  ({ACTIVE_POOL})")

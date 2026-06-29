@@ -22,7 +22,7 @@ import torch.nn.functional as F
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-CORPUS_FILE = "data/bloomfield_texts_sentences.csv"
+CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
 TEACHER_ID  = "KonradBRG/deberta-v3-base-figurative"
 OUTPUT_FILE = "data/figurative/eval_consistency.csv"
 
@@ -44,7 +44,7 @@ def get_probs(texts: list[str], model, tokenizer) -> np.ndarray:
     return np.array([[p[f"prob_{l}"] for l in LABEL_NAMES] for p in preds])
 
 
-df = pd.read_csv(CORPUS_FILE, encoding="utf-8-sig").dropna(subset=["text_cree", "text_en"])
+df = pd.read_parquet(CORPUS_FILE).dropna(subset=["text_cree", "text_en"])
 cree_texts = df["text_cree"].tolist()
 en_texts   = df["text_en"].tolist()
 print(f"Corpus: {len(df):,} pairs")

@@ -48,7 +48,7 @@ except ImportError:
 class DistillConfig:
     # Student: TLM-adapted XLM checkpoint (or figurative checkpoint for align/binary_kl)
     checkpoint:  str  = "KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm"
-    corpus_file: str  = "data/bloomfield_texts_sentences.csv"
+    corpus_file: str  = "data/bloomfield_texts_sentences.parquet"
 
     # "align" | "binary_kl" | "clkd"
     mode:        str  = "clkd"
@@ -265,7 +265,7 @@ def _distill_clkd(config: DistillConfig) -> str:
             _wandb.config.update(_clkd_cfg, allow_val_change=True)
 
     df = (
-        pd.read_csv(config.corpus_file, encoding="utf-8-sig")
+        pd.read_parquet(config.corpus_file)
         .dropna(subset=["text_cree", "text_en"])
     )
     print(f"[distill] mode=clkd  corpus={len(df):,} pairs  epochs={config.epochs}  "
@@ -395,7 +395,7 @@ def _distill_self(config: DistillConfig) -> str:
         print(f"[distill] head frozen — trainable params: {n:,}")
 
     df = (
-        pd.read_csv(config.corpus_file, encoding="utf-8-sig")
+        pd.read_parquet(config.corpus_file)
         .dropna(subset=["text_cree", "text_en"])
     )
     print(f"[distill] mode={config.mode}  corpus={len(df):,} pairs  "

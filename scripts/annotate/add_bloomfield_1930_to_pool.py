@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 SRC_FILE  = "data/sentences_bloomfield_1930.txt"
-POOL_FILE = "data/bloomfield_texts_sentences.csv"
+POOL_FILE = "data/bloomfield_texts_sentences.parquet"
 SOURCE_ID = "bloomfield_1930"
 
 # Minimum characters for a Cree sentence to be kept
@@ -105,14 +105,14 @@ def main() -> None:
     pairs = load_pairs(args.src)
     print(f"Loaded {len(pairs)} paragraph pairs from {args.src}")
 
-    pool = pd.read_csv(args.pool, encoding="utf-8-sig")
+    pool = pd.read_parquet(args.pool)
     known = set(pool["text_cree"].dropna().str.strip().tolist())
     print(f"Pool: {len(pool):,} existing sentences")
 
     # Also skip anything already in the gold set
-    gold_file = "data/figurative/bloomfield_annotated.csv"
+    gold_file = "data/figurative/bloomfield_annotated.parquet"
     if os.path.exists(gold_file):
-        gold = pd.read_csv(gold_file, encoding="utf-8-sig")
+        gold = pd.read_parquet(gold_file)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())
 
     # Determine next paragraph_id
@@ -154,7 +154,7 @@ def main() -> None:
         # Back-fill existing rows as bloomfield_1934
         merged.loc[merged.index < len(pool), "source_file"] = "bloomfield_1934"
 
-    merged.to_csv(args.pool, index=False, encoding="utf-8-sig")
+    merged.to_parquet(args.pool, index=False)
     print(f"Pool: {len(pool):,} → {len(merged):,} sentences → {args.pool}")
     print(f"\nSample:")
     for _, r in new_df.head(5).iterrows():

@@ -29,7 +29,7 @@ FIGURATIVE_PRESETS = {
 
 def scrape() -> pd.DataFrame:
     """ Scrape Bloomfield Plains Cree texts and save to data/bloomfield_texts.csv."""
-    df = BloomfieldScraper().scrape(output="data/bloomfield_texts.csv")
+    df = BloomfieldScraper().scrape(output="data/bloomfield_texts.parquet")
     return df
 
 
@@ -41,7 +41,7 @@ def scrape_edtekla(output: str, append: bool = False) -> None:
 def eda(df: pd.DataFrame | None = None) -> None:
     """Run basic EDA on the Bloomfield texts and save figures to figures/."""
     if df is None:
-        df = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
+        df = pd.read_parquet("data/bloomfield_texts.parquet")
     e = EDA(df)
     summary, figures = e.run()
     print(summary)
@@ -53,10 +53,10 @@ def eda(df: pd.DataFrame | None = None) -> None:
 
 def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
     """Run LLM annotation on the Bloomfield paragraphs and save to data/bloomfield_texts_annotated.csv."""
-    path = "data/bloomfield_texts_annotated.csv"
+    path = "data/bloomfield_texts_annotated.parquet"
     if df is None:
-        src = path if os.path.exists(path) else "data/bloomfield_texts.csv"
-        df  = pd.read_csv(src, encoding="utf-8-sig")
+        src = path if os.path.exists(path) else "data/bloomfield_texts.parquet"
+        df  = pd.read_parquet(src)
     for col in ("annotation", "reasoning"):
         if col not in df.columns:
             df[col] = pd.NA
@@ -72,7 +72,7 @@ def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
         except (Exception, KeyboardInterrupt) as e:
             tqdm.write(f"Error at paragraph {i}: {e}")
             break
-    df.to_csv(path, index=False, encoding="utf-8-sig")
+    df.to_parquet(path, index=False)
     print(f"Saved → {path}")
     return df
 
@@ -101,7 +101,7 @@ def fine_tune(
         )
         print(f"Loaded {len(sent_df):,} pairs from {sentences_file}")
     else:
-        df      = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
+        df      = pd.read_parquet("data/bloomfield_texts.parquet")
         sent_df = ParallelSentenceSplitter(df).split()
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
@@ -141,7 +141,7 @@ def figurative_distill(
     teacher_checkpoint:  str | None = None,
     freeze_n_layers:     int        = 0,
     mode:                str        = "clkd",
-    corpus_file:         str        = "data/bloomfield_texts_sentences.csv",
+    corpus_file:         str        = "data/bloomfield_texts_sentences.parquet",
     epochs:              int        = 10,
     batch_size:          int        = 16,
     learning_rate:       float      = 5e-6,
@@ -175,7 +175,7 @@ def calibrate(
     output_dir:   str        = "data/calibrated",
     hub_model_id: str | None = None,
     wandb_project: str | None = None,
-    annot_file:   str        = "data/figurative/bloomfield_annotated.csv",
+    annot_file:   str        = "data/figurative/bloomfield_annotated.parquet",
     epochs:       int        = 10,
     batch_size:   int        = 8,
     learning_rate: float     = 5e-6,
@@ -216,12 +216,12 @@ def figurative_eval_idioms(
 
 def predict_figurative(
     checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
-    input_file:  str = "data/bloomfield_texts_sentences.csv",
+    input_file:  str = "data/bloomfield_texts_sentences.parquet",
     output_file: str = "data/bloomfield_figurative.csv",
     idioms_file: str = "data/idioms.txt",
 ) -> pd.DataFrame:
     """ Run figurative detection on Bloomfield Cree sentences and save results to CSV."""
-    sentences_df = pd.read_csv(input_file, encoding="utf-8-sig")
+    sentences_df = pd.read_parquet(input_file)
     print(f"Loaded {len(sentences_df):,} sentences from {input_file}")
 
     model, tokenizer = figurative_load_model(checkpoint)
@@ -258,12 +258,12 @@ def predict_figurative(
 
 def split_sentences(output: str, confidence: float = 0.0) -> None:
     """ Split Bloomfield paragraphs into sentence pairs and write src ||| tgt to output file."""
-    df = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
+    df = pd.read_parquet("data/bloomfield_texts.parquet")
     splitter = ParallelSentenceSplitter(df)
     splitter.write(output, min_confidence=confidence)
     sent_df = splitter.split()
     if confidence > 0:
         sent_df = sent_df[sent_df.confidence >= confidence]
-    csv_path = "data/bloomfield_texts_sentences.csv"
-    sent_df.to_csv(csv_path, index=False, encoding="utf-8-sig")
+    csv_path = "data/bloomfield_texts_sentences.parquet"
+    sent_df.to_parquet(csv_path, index=False)
     print(f"Saved {len(sent_df):,} sentence pairs → {csv_path}")

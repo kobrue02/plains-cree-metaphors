@@ -39,7 +39,7 @@ LABEL_MAP = {
 @dataclass
 class CalibrateConfig:
     checkpoint:   str            # CLKD model to start from
-    annot_file:   str  = "data/figurative/bloomfield_annotated.csv"
+    annot_file:   str  = "data/figurative/bloomfield_annotated.parquet"
     output_dir:   str  = "data/calibrated"
     hub_model_id: str | None = None
     wandb_project: str | None = None
@@ -67,7 +67,7 @@ class _WeightedTrainer(Trainer):
 
 
 def _load_records(config: CalibrateConfig) -> list[dict]:
-    df = pd.read_csv(config.annot_file, encoding="utf-8-sig")
+    df = pd.read_parquet(config.annot_file)
     df["label"] = (df["label"].str.strip().str.lower()
                    .map(lambda x: LABEL_MAP.get(x, "literal")))
     df = df.dropna(subset=["text_cree", "label"])

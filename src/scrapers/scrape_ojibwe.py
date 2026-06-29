@@ -19,7 +19,6 @@ Output: CSV with columns  story, para_idx, text_ojibwe, text_en
 
 from __future__ import annotations
 import re
-import csv
 import os
 import sys
 from pathlib import Path
@@ -184,15 +183,16 @@ def parse(path: str | Path) -> list[Story]:
 
 # ── Output ─────────────────────────────────────────────────────────────────────
 
-def to_csv(stories: list[Story], out_path: str | Path) -> None:
+def to_parquet(stories: list[Story], out_path: str | Path) -> None:
+    import pandas as pd
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.writer(f)
-        writer.writerow(["story", "para_idx", "text_ojibwe", "text_en"])
-        for story in stories:
-            pairs = list(zip(story.ojibwe, story.english))
-            for i, (oji, eng) in enumerate(pairs):
-                writer.writerow([story.title, i, oji, eng])
+    rows = []
+    for story in stories:
+        pairs = list(zip(story.ojibwe, story.english))
+        for i, (oji, eng) in enumerate(pairs):
+            rows.append({"story": story.title, "para_idx": i,
+                         "text_ojibwe": oji, "text_en": eng})
+    pd.DataFrame(rows).to_parquet(out_path, index=False)
 
 
 def to_parallel(stories: list[Story], out_path: str | Path) -> None:
@@ -211,7 +211,7 @@ if __name__ == "__main__":
 
     p = argparse.ArgumentParser(description="Parse Jones/Michelson Ojibwa Texts into aligned paragraph pairs.")
     p.add_argument("--input",   default="data/ojibwatextscoll07jonerich_djvu.txt")
-    p.add_argument("--csv",     default="data/ojibwe_texts_aligned.csv")
+    p.add_argument("--csv",     default="data/ojibwe_texts_aligned.parquet")
     p.add_argument("--parallel", default=None,
                    help="Also write src ||| tgt file for TLM (e.g. data/ojibwe_sentences.txt)")
     p.add_argument("--verbose", action="store_true")
@@ -228,8 +228,8 @@ if __name__ == "__main__":
             n = min(len(s.ojibwe), len(s.english))
             print(f"  {s.title[:60]:<60}  oji={len(s.ojibwe)}  en={len(s.english)}  pairs={n}")
 
-    to_csv(stories, args.csv)
-    print(f"Saved CSV  → {args.csv}")
+    to_parquet(stories, args.csv)
+    print(f"Saved parquet  → {args.csv}")
 
     if args.parallel:
         to_parallel(stories, args.parallel)

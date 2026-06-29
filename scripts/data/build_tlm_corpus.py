@@ -23,11 +23,11 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 
-BLOOMFIELD_CSV  = "data/bloomfield_texts.csv"
+BLOOMFIELD_CSV  = "data/bloomfield_texts.parquet"
 BLOOMFIELD_OUT  = "data/sentences_bloomfield.txt"
 EDTEKLA_OUT     = "data/sentences_edtekla.txt"
 OJIBWE_TXT      = "data/ojibwatextscoll07jonerich_djvu.txt"
-OJIBWE_CSV      = "data/ojibwe_texts_aligned.csv"
+OJIBWE_CSV      = "data/ojibwe_texts_aligned.parquet"
 OJIBWE_OUT      = "data/sentences_ojibwe.txt"
 OKIMASIS_PDF       = "data/creelanguageoftheplainstextbook.pdf"
 OKIMASIS_OUT       = "data/sentences_okimasis.txt"
@@ -45,7 +45,7 @@ def build_bloomfield(skip_scrape: bool = False) -> int:
         print("Scraping Bloomfield texts ...")
         BloomfieldScraper().scrape(output=BLOOMFIELD_CSV)
 
-    df = pd.read_csv(BLOOMFIELD_CSV)
+    df = pd.read_parquet(BLOOMFIELD_CSV)
     splitter = ParallelSentenceSplitter(df)
     splitter.write(BLOOMFIELD_OUT)
     return sum(1 for _ in open(BLOOMFIELD_OUT))
@@ -89,10 +89,10 @@ def build_bloomfield_1930() -> int:
 
 
 def build_ojibwe() -> int:
-    from src.scrapers.scrape_ojibwe import parse, to_csv, to_parallel
+    from src.scrapers.scrape_ojibwe import parse, to_parquet, to_parallel
     print("\nParsing Ojibwe texts ...")
     stories = parse(OJIBWE_TXT)
-    to_csv(stories, OJIBWE_CSV)
+    to_parquet(stories, OJIBWE_CSV)
     to_parallel(stories, OJIBWE_OUT)
     return sum(1 for _ in open(OJIBWE_OUT))
 

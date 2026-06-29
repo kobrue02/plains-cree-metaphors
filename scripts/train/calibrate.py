@@ -9,7 +9,7 @@ if __name__ == "__main__":
     p.add_argument("--checkpoint",    required=True)
     p.add_argument("--output-dir",    default="data/calibrated")
     p.add_argument("--hub-model-id",  default=None)
-    p.add_argument("--annot-file",    default="data/figurative/bloomfield_annotated.csv")
+    p.add_argument("--annot-file",    default="data/figurative/bloomfield_annotated.parquet")
     p.add_argument("--epochs",        type=int,   default=10)
     p.add_argument("--batch-size",    type=int,   default=8)
     p.add_argument("--learning-rate", type=float, default=5e-6)

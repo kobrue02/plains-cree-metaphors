@@ -14,8 +14,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 IDIOMS_FILE = "data/idioms.txt"
-POOL_FILE   = "data/figurative/active_pool.csv"
-ANNOT_FILE  = "data/figurative/bloomfield_annotated.csv"
+POOL_FILE   = "data/figurative/active_pool.parquet"
+ANNOT_FILE  = "data/figurative/bloomfield_annotated.parquet"
 
 
 def load_idioms(path: str) -> list[tuple[str, str]]:
@@ -66,9 +66,9 @@ def main() -> None:
     if not os.path.exists(args.pool):
         sys.exit(f"Pool file not found: {args.pool}\nRun 'scripts/active_loop.py infer' first.")
 
-    pool = pd.read_csv(args.pool, encoding="utf-8-sig")
+    pool = pd.read_parquet(args.pool)
 
-    gold     = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
+    gold     = pd.read_parquet(ANNOT_FILE)
     known    = set(gold["text_cree"].dropna().str.strip().tolist())
     pool_new = pool[~pool["text_cree"].str.strip().isin(known)]
     print(f"Pool: {len(pool):,} total, {len(pool_new):,} not yet in gold set\n")
@@ -108,7 +108,7 @@ def main() -> None:
     } for r in unique])
 
     merged = pd.concat([gold, new_rows], ignore_index=True)
-    merged.to_csv(ANNOT_FILE, index=False, encoding="utf-8-sig")
+    merged.to_parquet(ANNOT_FILE, index=False)
 
     print(f"\nAppended {len(unique)} idiom sentences → {ANNOT_FILE}")
     print(f"Gold set: {len(gold):,} → {len(merged):,} sentences")

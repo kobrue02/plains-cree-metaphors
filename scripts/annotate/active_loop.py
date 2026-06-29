@@ -30,10 +30,10 @@ import pandas as pd
 
 WANDB_PROJECT    = "FNLP"
 CALIBRATED_MODEL = "KonradBRG/xlm-mlm-plains-cree-en-calibrated"
-ANNOT_FILE       = "data/figurative/bloomfield_annotated.csv"
-POOL_FILE        = "data/bloomfield_texts_sentences.csv"
-ACTIVE_POOL      = "data/figurative/active_pool.csv"
-ACTIVE_ANNOT     = "data/figurative/active_annotations.csv"
+ANNOT_FILE       = "data/figurative/bloomfield_annotated.parquet"
+POOL_FILE        = "data/bloomfield_texts_sentences.parquet"
+ACTIVE_POOL      = "data/figurative/active_pool.parquet"
+ACTIVE_ANNOT     = "data/figurative/active_annotations.parquet"
 LABELS           = ["literal", "idiom", "metaphor", "simile"]
 
 HIGH_CONF = 0.90
@@ -46,10 +46,10 @@ def phase_infer(checkpoint: str) -> pd.DataFrame:
     import wandb
     from src.figurative.predict import load_model, predict_sentences
 
-    annotated   = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
+    annotated   = pd.read_parquet(ANNOT_FILE)
     known_texts = set(annotated["text_cree"].dropna().str.strip().tolist())
 
-    pool     = pd.read_csv(POOL_FILE, encoding="utf-8-sig")
+    pool     = pd.read_parquet(POOL_FILE)
     pool     = pool.dropna(subset=["text_cree", "text_en"])
     pool["text_cree"] = pool["text_cree"].str.strip()
     unlabeled = pool[~pool["text_cree"].isin(known_texts)].copy().reset_index(drop=True)
@@ -66,7 +66,7 @@ def phase_infer(checkpoint: str) -> pd.DataFrame:
         unlabeled[key] = [p[key] for p in preds]
 
     os.makedirs(os.path.dirname(ACTIVE_POOL), exist_ok=True)
-    unlabeled.to_csv(ACTIVE_POOL, index=False, encoding="utf-8-sig")
+    unlabeled.to_parquet(ACTIVE_POOL, index=False)
 
     # Summary counts
     high_fig = (unlabeled["confidence"] >= HIGH_CONF) & (unlabeled["label"] != "literal")
@@ -154,7 +154,7 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     # Skip already-annotated
     done_texts: set[str] = set()
     if os.path.exists(ACTIVE_ANNOT):
-        done = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+        done = pd.read_parquet(ACTIVE_ANNOT)
         done_texts = set(done["text_cree"].dropna().str.strip().tolist())
         queue = queue[~queue["text_cree"].isin(done_texts)]
 
@@ -209,10 +209,10 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
 
     # Merge with any existing active annotations
     if os.path.exists(ACTIVE_ANNOT) and done_texts:
-        existing = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+        existing = pd.read_parquet(ACTIVE_ANNOT)
         new_df = pd.concat([existing, new_df], ignore_index=True)
 
-    new_df.to_csv(ACTIVE_ANNOT, index=False, encoding="utf-8-sig")
+    new_df.to_parquet(ACTIVE_ANNOT, index=False)
 
     overall_agreement = sum(agreements) / len(agreements) if agreements else 0.0
     wandb.log({
@@ -240,11 +240,11 @@ def phase_retrain(
     import wandb
     from funcs import calibrate
 
-    gold   = pd.read_csv(ANNOT_FILE, encoding="utf-8-sig")
-    active = pd.read_csv(ACTIVE_ANNOT, encoding="utf-8-sig")
+    gold   = pd.read_parquet(ANNOT_FILE)
+    active = pd.read_parquet(ACTIVE_ANNOT)
 
     # High-confidence figurative predictions → pseudo-labels
-    pool   = pd.read_csv(ACTIVE_POOL, encoding="utf-8-sig")
+    pool   = pd.read_parquet(ACTIVE_POOL)
     pseudo = pool[
         (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
     ][["text_cree", "text_en", "label"]].copy()
@@ -270,10 +270,9 @@ def phase_retrain(
         **{f"retrain/label_{l}": int((combined["label"] == l).sum()) for l in LABELS},
     })
 
-    tmp = tempfile.NamedTemporaryFile(suffix=".csv", delete=False, mode="w",
-                                      encoding="utf-8-sig", newline="")
-    combined.to_csv(tmp.name, index=False)
+    tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp.close()
+    combined.to_parquet(tmp.name, index=False)
 
     # Tell HF Trainer's WandbCallback to join our existing run
     os.environ["WANDB_PROJECT"] = WANDB_PROJECT
@@ -343,7 +342,7 @@ def main() -> None:
         if not os.path.exists(ACTIVE_POOL):
             sys.exit(f"--skip-infer set but {ACTIVE_POOL} not found. Run without --skip-infer first.")
         print(f"[infer] skipping — loading {ACTIVE_POOL}")
-        pool = pd.read_csv(ACTIVE_POOL, encoding="utf-8-sig")
+        pool = pd.read_parquet(ACTIVE_POOL)
         wandb.log({"infer/pool_size": len(pool), "infer/skipped": True})
     else:
         pool = phase_infer(args.checkpoint)
