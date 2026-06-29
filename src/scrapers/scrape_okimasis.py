@@ -17,8 +17,8 @@ Cree text is identified by SRO macron vowels: ā ē ī ō
 (this book uses macrons; Bloomfield uses circumflexes — both are valid SRO)
 
 Usage:
-  python scripts/scrape_okimasis.py --pdf <path>
-  python scripts/scrape_okimasis.py --pdf <path> --out data/sentences_okimasis.txt
+  python src/scrapers/scrape_okimasis.py --pdf <path>
+  python src/scrapers/scrape_okimasis.py --pdf <path> --out data/sentences_okimasis.txt
 """
 
 from __future__ import annotations
@@ -88,7 +88,7 @@ def _split_inline(line: str) -> tuple[str, str] | None:
     return None
 
 
-def extract_pairs(text: str) -> list[tuple[str, str]]:
+def _extract_pairs(text: str) -> list[tuple[str, str]]:
     pairs: list[tuple[str, str]] = []
     lines  = text.splitlines()
     i = 0
@@ -150,7 +150,7 @@ def extract_pairs(text: str) -> list[tuple[str, str]]:
     return pairs
 
 
-def dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+def _dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
     seen: set[str] = set()
     out  = []
     for cree, en in pairs:
@@ -159,6 +159,68 @@ def dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
             seen.add(key)
             out.append((cree, en))
     return out
+
+
+def _keep(cree: str, en: str, min_cree_len: int = 5) -> bool:
+    if len(cree) < min_cree_len:
+        return False
+    if not _has_cree(cree):
+        return False
+    # Syllable breakdown: Cree side has isolated single syllables with spaces
+    # e.g. "tā ni si" or "pi mā ci ho win"
+    if re.search(r"\b[a-zāēīō]{1,3} [a-zāēīō]{1,3} [a-zāēīō]{1,3}\b", cree):
+        return False
+    # Derivation formula lines
+    if "+" in cree or "=" in cree:
+        return False
+    # Parenthetical gloss in Cree side indicates derivation example
+    if re.search(r"\([a-z]", cree):
+        return False
+    # Grammar metalanguage on English side
+    if re.search(r"\b(subject|verb|object|noun|stem|suffix|prefix)\b", en, re.I):
+        return False
+    # English side starts with a number (numbered list item from derivation chapter)
+    if re.match(r"\d+\.", en):
+        return False
+    # Bibliography / metadata
+    if re.search(r"(isbn|pm\d{3}|\d{4}-\d{4}|edition\.|new edition)", en, re.I):
+        return False
+    # English side looks like a prose sentence fragment (from front matter)
+    if re.match(r"(Includes|As a result|Some changes|This edition)", en):
+        return False
+    # Author name line
+    if re.match(r"Jean L\.", cree):
+        return False
+    return True
+
+
+def extract(pdf_path: str, min_cree_len: int = 5) -> list[tuple[str, str]]:
+    """Extract (cree, english) parallel pairs from the Okimasis PDF.
+
+    Parameters
+    ----------
+    pdf_path:
+        Path to the Okimasis PDF file.
+    min_cree_len:
+        Minimum number of characters required in the Cree side of a pair.
+
+    Returns
+    -------
+    list of (cree, english) tuples after deduplication and filtering.
+    """
+    try:
+        import fitz  # pymupdf
+        doc  = fitz.open(pdf_path)
+        text = "\n".join(
+            page.get_text("text", sort=True) for page in doc
+        )
+    except ImportError:
+        raise ImportError("pymupdf not installed — run: uv sync")
+
+    pairs = _extract_pairs(text)
+    pairs = _dedup(pairs)
+    pairs = [(c, e) for c, e in pairs if _keep(c, e, min_cree_len=min_cree_len)]
+    return pairs
 
 
 def main() -> None:
@@ -175,53 +237,7 @@ def main() -> None:
         sys.exit(f"PDF not found: {args.pdf}")
 
     print(f"Extracting text from {args.pdf} ...")
-    try:
-        import fitz  # pymupdf
-        doc  = fitz.open(args.pdf)
-        text = "\n".join(
-            page.get_text("text", sort=True) for page in doc
-        )
-    except ImportError:
-        sys.exit("pymupdf not installed — run: uv sync")
-
-    print("Parsing parallel pairs ...")
-    pairs = extract_pairs(text)
-    pairs = dedup(pairs)
-
-    # Filter junk
-    def _keep(cree: str, en: str) -> bool:
-        if len(cree) < args.min_cree_len:
-            return False
-        if not _has_cree(cree):
-            return False
-        # Syllable breakdown: Cree side has isolated single syllables with spaces
-        # e.g. "tā ni si" or "pi mā ci ho win"
-        if re.search(r"\b[a-zāēīō]{1,3} [a-zāēīō]{1,3} [a-zāēīō]{1,3}\b", cree):
-            return False
-        # Derivation formula lines
-        if "+" in cree or "=" in cree:
-            return False
-        # Parenthetical gloss in Cree side indicates derivation example
-        if re.search(r"\([a-z]", cree):
-            return False
-        # Grammar metalanguage on English side
-        if re.search(r"\b(subject|verb|object|noun|stem|suffix|prefix)\b", en, re.I):
-            return False
-        # English side starts with a number (numbered list item from derivation chapter)
-        if re.match(r"\d+\.", en):
-            return False
-        # Bibliography / metadata
-        if re.search(r"(isbn|pm\d{3}|\d{4}-\d{4}|edition\.|new edition)", en, re.I):
-            return False
-        # English side looks like a prose sentence fragment (from front matter)
-        if re.match(r"(Includes|As a result|Some changes|This edition)", en):
-            return False
-        # Author name line
-        if re.match(r"Jean L\.", cree):
-            return False
-        return True
-
-    pairs = [(c, e) for c, e in pairs if _keep(c, e)]
+    pairs = extract(args.pdf, min_cree_len=args.min_cree_len)
 
     os.makedirs(os.path.dirname(args.out) if os.path.dirname(args.out) else ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:

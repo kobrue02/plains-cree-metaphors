@@ -3,7 +3,7 @@ Regenerate all TLM training data sources and consolidate into a single parquet f
 
 Output files:
   data/sentences.parquet                 — columns: text_cree, text_en, source
-  data/bloomfield_texts_sentences.parquet — Bloomfield 1934 sentence pool (CLKD + active loop)
+  data/bloomfield_texts_sentences.parquet — Bloomfield 1934+1930 sentence pool (CLKD + active loop)
     source values:
       "bloomfield_1934"   — Plains Cree-English (Bloomfield 1934)
       "edtekla"           — Plains Cree-English (Teodorescu et al. 2022)
@@ -32,10 +32,6 @@ OJIBWE_TXT       = "data/ojibwatextscoll07jonerich_djvu.txt"
 OKIMASIS_PDF        = "data/creelanguageoftheplainstextbook.pdf"
 BLOOMFIELD_1930_PDF = "data/sacred-stories-bloomfield-1930.pdf"
 SENTENCES_OUT       = "data/sentences.parquet"
-
-# Internal temp paths used by subprocess-based scrapers (not exported constants)
-_OKIMASIS_OUT       = "data/sentences_okimasis.txt"
-_BLOOMFIELD_1930_OUT = "data/sentences_bloomfield_1930.txt"
 
 
 def build_bloomfield_df(skip_scrape: bool = False) -> pd.DataFrame:
@@ -84,52 +80,6 @@ def build_ojibwe_df() -> pd.DataFrame:
     return df
 
 
-def build_okimasis_df() -> pd.DataFrame:
-    import subprocess
-    print("\nExtracting Okimāsis textbook pairs ...")
-    result = subprocess.run(
-        [sys.executable, "scripts/data/scrape_okimasis.py",
-         "--pdf", OKIMASIS_PDF, "--out", _OKIMASIS_OUT],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        print(f"  WARNING: scrape_okimasis.py failed: {result.stderr.strip()}")
-        return pd.DataFrame(columns=["text_cree", "text_en", "source"])
-    print(result.stdout.strip())
-    df = pd.read_csv(
-        _OKIMASIS_OUT,
-        sep=r"\s*\|\|\|\s*",
-        header=None,
-        names=["text_cree", "text_en"],
-        engine="python",
-    )
-    df["source"] = "okimasis"
-    return df
-
-
-def build_bloomfield_1930_df() -> pd.DataFrame:
-    import subprocess
-    print("\nExtracting Bloomfield (1930) paragraph pairs ...")
-    result = subprocess.run(
-        [sys.executable, "scripts/data/scrape_bloomfield_1930.py",
-         "--pdf", BLOOMFIELD_1930_PDF, "--out", _BLOOMFIELD_1930_OUT],
-        capture_output=True, text=True,
-    )
-    if result.returncode != 0:
-        print(f"  WARNING: scrape_bloomfield_1930.py failed: {result.stderr.strip()}")
-        return pd.DataFrame(columns=["text_cree", "text_en", "source"])
-    print(result.stdout.strip())
-    df = pd.read_csv(
-        _BLOOMFIELD_1930_OUT,
-        sep=r"\s*\|\|\|\s*",
-        header=None,
-        names=["text_cree", "text_en"],
-        engine="python",
-    )
-    df["source"] = "bloomfield_1930"
-    return df
-
-
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -162,15 +112,32 @@ def main() -> None:
 
     # Okimasis
     if not args.skip_okimasis:
-        dfs.append(build_okimasis_df())
+        if os.path.exists(OKIMASIS_PDF):
+            from src.scrapers.scrape_okimasis import extract
+            print("\nExtracting Okimāsis textbook pairs ...")
+            pairs_okimasis = extract(OKIMASIS_PDF)
+            df_okimasis = pd.DataFrame(pairs_okimasis, columns=["text_cree", "text_en"])
+            df_okimasis["source"] = "okimasis"
+            dfs.append(df_okimasis)
+            print(f"  Okimāsis: {len(pairs_okimasis)} pairs")
+        else:
+            print(f"Okimāsis: PDF not found at {OKIMASIS_PDF}, skipping")
+            dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
     else:
         print("Okimāsis: skipped (--skip-okimasis)")
         dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
 
     # Bloomfield 1930
+    pairs_1930: list[tuple[str, str]] = []
     if not args.skip_bloomfield_1930:
         if os.path.exists(BLOOMFIELD_1930_PDF):
-            dfs.append(build_bloomfield_1930_df())
+            from src.scrapers.scrape_bloomfield_1930 import extract
+            print("\nExtracting Bloomfield (1930) paragraph pairs ...")
+            pairs_1930 = extract(BLOOMFIELD_1930_PDF)
+            df_1930 = pd.DataFrame(pairs_1930, columns=["text_cree", "text_en"])
+            df_1930["source"] = "bloomfield_1930"
+            dfs.append(df_1930)
+            print(f"  Bloomfield (1930): {len(pairs_1930)} pairs")
         else:
             print(f"Bloomfield 1930: PDF not found at {BLOOMFIELD_1930_PDF}, skipping")
             dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
@@ -194,6 +161,13 @@ def main() -> None:
     print(f"  {'─'*30}")
     print(f"  Combined                   {len(combined):>6,}")
     print(f"  → {SENTENCES_OUT}")
+
+    # Add Bloomfield 1930 sentences to the annotation pool
+    if pairs_1930:
+        print(f"\n{'─'*50}")
+        print("  Updating annotation pool with Bloomfield 1930 sentences ...")
+        from scripts.annotate.add_bloomfield_1930_to_pool import add_to_pool
+        add_to_pool(src=pairs_1930, pool_path=BLOOMFIELD_SENTS)
 
 
 if __name__ == "__main__":

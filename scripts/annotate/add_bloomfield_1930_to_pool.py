@@ -88,34 +88,46 @@ def load_pairs(path: str) -> list[tuple[str, str]]:
     return pairs
 
 
-def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--src",     default=SRC_FILE,  help="Bloomfield 1930 pair file")
-    p.add_argument("--pool",    default=POOL_FILE,  help="Pool CSV to append to")
-    p.add_argument("--dry-run", action="store_true")
-    args = p.parse_args()
+def add_to_pool(
+    src: "str | list[tuple[str, str]]" = SRC_FILE,
+    pool_path: str = POOL_FILE,
+    dry_run: bool = False,
+) -> int:
+    """Add Bloomfield 1930 sentences to the annotation pool. Returns count of new sentences.
 
-    if not os.path.exists(args.src):
-        sys.exit(f"Source not found: {args.src}\nRun scrape_bloomfield_1930.py first.")
+    Parameters
+    ----------
+    src:
+        Either a file path to a Cree ||| English text file, or a list of
+        (cree, english) tuples returned directly by scrape_bloomfield_1930.extract().
+    pool_path:
+        Path to the parquet pool file to append to.
+    dry_run:
+        If True, report what would be added without writing.
+    """
+    if isinstance(src, str):
+        if not os.path.exists(src):
+            print(f"  [skip] {src} not found")
+            return 0
+        pairs = load_pairs(src)
+        print(f"Loaded {len(pairs)} paragraph pairs from {src}")
+    else:
+        pairs = src
+        print(f"Loaded {len(pairs)} paragraph pairs (in-memory)")
 
-    if not os.path.exists(args.pool):
-        sys.exit(f"Pool not found: {args.pool}\nRun the active loop's infer phase first.")
+    if not os.path.exists(pool_path):
+        print(f"  [skip] pool not found at {pool_path}")
+        return 0
 
-    pairs = load_pairs(args.src)
-    print(f"Loaded {len(pairs)} paragraph pairs from {args.src}")
-
-    pool = pd.read_parquet(args.pool)
+    pool = pd.read_parquet(pool_path)
     known = set(pool["text_cree"].dropna().str.strip().tolist())
     print(f"Pool: {len(pool):,} existing sentences")
 
-    # Also skip anything already in the gold set
     gold_file = "data/figurative/annotations.parquet"
     if os.path.exists(gold_file):
         gold = pd.read_parquet(gold_file)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())
 
-    # Determine next paragraph_id
     next_para_id = int(pool["paragraph_id"].max()) + 1 if len(pool) > 0 else 0
 
     new_rows = []
@@ -128,7 +140,7 @@ def main() -> None:
                 "paragraph_id": next_para_id,
                 "sentence_id":  sent_id,
                 "text_cree":    sent,
-                "text_en":      para_en,   # paragraph-level English as reference gloss
+                "text_en":      para_en,
                 "confidence":   None,
                 "source_file":  SOURCE_ID,
             })
@@ -137,30 +149,33 @@ def main() -> None:
 
     print(f"\nExtracted {len(new_rows)} new sentences (after dedup)")
 
-    if args.dry_run or not new_rows:
+    if dry_run or not new_rows:
         if new_rows:
             print("\nSample (dry run):")
-            for r in new_rows[:5]:
+            for r in new_rows[:3]:
                 print(f"  CREE: {r['text_cree'][:80]}")
                 print(f"  EN:   {r['text_en'][:80]}")
-                print()
-        return
+        return len(new_rows)
 
-    new_df  = pd.DataFrame(new_rows)
-    merged  = pd.concat([pool, new_df], ignore_index=True)
+    new_df = pd.DataFrame(new_rows)
+    merged = pd.concat([pool, new_df], ignore_index=True)
 
-    # Keep source_file column even if original pool didn't have it
     if "source_file" not in pool.columns:
-        # Back-fill existing rows as bloomfield_1934
         merged.loc[merged.index < len(pool), "source_file"] = "bloomfield_1934"
 
-    merged.to_parquet(args.pool, index=False)
-    print(f"Pool: {len(pool):,} → {len(merged):,} sentences → {args.pool}")
-    print(f"\nSample:")
-    for _, r in new_df.head(5).iterrows():
-        print(f"  CREE: {r['text_cree'][:80]}")
-        print(f"  EN:   {r['text_en'][:80]}")
-        print()
+    merged.to_parquet(pool_path, index=False)
+    print(f"Pool: {len(pool):,} → {len(merged):,} sentences → {pool_path}")
+    return len(new_rows)
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--src",     default=SRC_FILE,  help="Bloomfield 1930 pair file")
+    p.add_argument("--pool",    default=POOL_FILE,  help="Pool parquet to append to")
+    p.add_argument("--dry-run", action="store_true")
+    args = p.parse_args()
+    add_to_pool(src=args.src, pool_path=args.pool, dry_run=args.dry_run)
 
 
 if __name__ == "__main__":

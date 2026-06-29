@@ -7,19 +7,27 @@ curves, annotation stats, and data provenance are all in one place.
 Usage
 -----
   # Full loop (infer + annotate + retrain)
-  python scripts/active_loop.py
+  python scripts/annotate/active_loop.py
+  python scripts/annotate/active_loop.py loop
 
-  # Skip inference if active_pool.csv already exists
-  python scripts/active_loop.py --skip-infer
+  # Skip inference if active_pool.parquet already exists
+  python scripts/annotate/active_loop.py --skip-infer
+  python scripts/annotate/active_loop.py loop --skip-infer
 
   # Annotate all queue items (default) or cap at N
-  python scripts/active_loop.py --max-annotate 500
+  python scripts/annotate/active_loop.py --max-annotate 500
 
   # Dry run: infer + annotate only, no retraining
-  python scripts/active_loop.py --no-retrain
+  python scripts/annotate/active_loop.py --no-retrain
 
   # Push retrained model to Hub
-  python scripts/active_loop.py --push-to-hub KonradBRG/xlm-mlm-plains-cree-en-active-v1
+  python scripts/annotate/active_loop.py --push-to-hub KonradBRG/xlm-mlm-plains-cree-en-active-v1
+
+  # Individual phase subcommands (no wandb by default)
+  python scripts/annotate/active_loop.py infer
+  python scripts/annotate/active_loop.py annotate [--mode human|deepseek] [--batch N]
+  python scripts/annotate/active_loop.py retrain
+  python scripts/annotate/active_loop.py status
 """
 
 from __future__ import annotations
@@ -39,7 +47,7 @@ HIGH_CONF = 0.90
 LOW_CONF  = 0.75
 
 
-# ── Phase 1: Infer ────────────────────────────────────────────────────────────
+# ── Phase 1: Infer (full-loop version, logs to wandb) ─────────────────────────
 
 def phase_infer(checkpoint: str) -> pd.DataFrame:
     import wandb
@@ -91,7 +99,7 @@ def phase_infer(checkpoint: str) -> pd.DataFrame:
     return unlabeled
 
 
-# ── Phase 2: DeepSeek annotation ─────────────────────────────────────────────
+# ── Phase 2: DeepSeek annotation (full-loop version, logs to wandb) ───────────
 
 _SYSTEM_PROMPT = """\
 You are annotating Plains Cree sentences from Leonard Bloomfield's 1934 fieldwork
@@ -228,7 +236,7 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     return new_df
 
 
-# ── Phase 3: Retrain ──────────────────────────────────────────────────────────
+# ── Phase 3: Retrain (full-loop version, logs to wandb) ───────────────────────
 
 def phase_retrain(
     checkpoint:   str,
@@ -298,33 +306,279 @@ def phase_retrain(
     print(f"[retrain] saved → {output_dir}")
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+# ── Subcommand implementations (no wandb) ─────────────────────────────────────
 
-def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--checkpoint",   default=CALIBRATED_MODEL,
-                   help="Model to run inference with and retrain from")
-    p.add_argument("--skip-infer",   action="store_true",
-                   help="Skip inference — reuse existing active_pool.parquet")
-    p.add_argument("--max-annotate", type=int, default=0,
-                   help="Max sentences to annotate (0 = all)")
-    p.add_argument("--no-retrain",   action="store_true",
-                   help="Stop after annotation, do not retrain")
-    p.add_argument("--output-dir",   default="data/figurative/active_calibrated")
-    p.add_argument("--push-to-hub",  default=None, metavar="HUB_ID",
-                   help="Push retrained model to this Hub ID")
-    p.add_argument("--epochs",       type=int,   default=15)
-    p.add_argument("--lr",           type=float, default=3.78e-6)
-    p.add_argument("--literal-ratio",type=int,   default=5)
-    p.add_argument("--run-name",     default=None,
-                   help="wandb run name (default: auto)")
-    args = p.parse_args()
+def cmd_infer(args) -> None:
+    """Run inference only (no wandb)."""
+    import torch
+    from src.figurative.predict import load_model, predict_sentences
 
+    # Load already-annotated sentence texts to exclude
+    annotated = pd.read_parquet(ANNOT_FILE)
+    known_texts = set(annotated["text_cree"].dropna().str.strip().tolist())
+
+    # Load full pool
+    pool = pd.read_parquet(POOL_FILE)
+    pool = pool.dropna(subset=["text_cree", "text_en"])
+    pool["text_cree"] = pool["text_cree"].str.strip()
+
+    # Remove already-annotated
+    unlabeled = pool[~pool["text_cree"].isin(known_texts)].copy()
+    print(f"Unlabeled pool: {len(unlabeled):,} sentences "
+          f"({len(pool)-len(unlabeled):,} already annotated)")
+
+    checkpoint = getattr(args, "checkpoint", CALIBRATED_MODEL)
+    print(f"Loading model: {checkpoint}")
+    model, tok = load_model(checkpoint)
+
+    print("Running inference ...")
+    preds = predict_sentences(
+        unlabeled["text_cree"].tolist(), model, tok,
+        batch_size=32, max_length=256,
+    )
+
+    df = unlabeled.reset_index(drop=True).copy()
+    for key in ["label", "confidence", "prob_literal", "prob_idiom",
+                "prob_metaphor", "prob_simile"]:
+        df[key] = [p[key] for p in preds]
+
+    os.makedirs(os.path.dirname(ACTIVE_POOL), exist_ok=True)
+    df.to_parquet(ACTIVE_POOL, index=False)
+
+    # Summary
+    high_fig = df[(df["confidence"] >= HIGH_CONF) & (df["label"] != "literal")]
+    low      = df[df["confidence"] < LOW_CONF]
+    high_lit = df[(df["confidence"] >= HIGH_CONF) & (df["label"] == "literal")]
+
+    print(f"\nResults saved → {ACTIVE_POOL}")
+    print(f"  High-conf figurative (pseudo-label ready) : {len(high_fig):>5,}")
+    print(f"  Low-conf  (annotation queue)              : {len(low):>5,}")
+    print(f"  High-conf literal   (skip)                : {len(high_lit):>5,}")
+
+
+def _deepseek_annotate_simple(prompt: str, model_probs: dict) -> str:
+    """Call DeepSeek to annotate a sentence. Returns label string."""
+    try:
+        from openai import OpenAI
+        client = OpenAI(
+            api_key=os.environ["DEEPSEEK_API_KEY"],
+            base_url="https://api.deepseek.com",
+        )
+        prob_str = "  ".join(f"{k}={v:.2f}" for k, v in model_probs.items())
+        system = (
+            "You are an expert in Plains Cree linguistics and figurative language. "
+            "Classify sentences as: literal, metaphor, idiom, or simile. "
+            "Respond with ONLY one word."
+        )
+        user = (
+            f"{prompt}\n\n"
+            f"Model probability estimates: {prob_str}\n"
+            f"Your classification (literal/metaphor/idiom/simile):"
+        )
+        resp = client.chat.completions.create(
+            model="deepseek-reasoner",
+            messages=[{"role": "system", "content": system},
+                      {"role": "user",   "content": user}],
+            max_tokens=10,
+        )
+        label = resp.choices[0].message.content.strip().lower()
+        return label if label in LABELS else "literal"
+    except Exception as exc:
+        print(f"  DeepSeek error: {exc}")
+        return "literal"
+
+
+def _human_annotate(prompt: str, model_probs: dict) -> str | None:
+    """Interactive CLI annotation. Returns label string or None to skip."""
+    print("\n" + "─" * 60)
+    print(prompt)
+    prob_str = "  ".join(f"{k}={v:.2f}" for k, v in model_probs.items())
+    print(f"\nModel probs: {prob_str}")
+    print("\n[l]iteral  [m]etaphor  [i]diom  [s]imile  [?]skip")
+    while True:
+        key = input("Label: ").strip().lower()
+        mapping = {"l": "literal", "m": "metaphor", "i": "idiom",
+                   "s": "simile", "literal": "literal",
+                   "metaphor": "metaphor", "idiom": "idiom",
+                   "simile": "simile", "?": None}
+        if key in mapping:
+            return mapping[key]
+        print("  Enter l/m/i/s or ? to skip.")
+
+
+def cmd_annotate(args) -> None:
+    """Annotate queue only (no wandb)."""
+    from src.scrapers.scrape_itwewina import lookup_sentence
+    from src.scrapers.scrape_itwewina import format_for_prompt
+
+    if not os.path.exists(ACTIVE_POOL):
+        sys.exit(f"Run 'infer' first — {ACTIVE_POOL} not found.")
+
+    pool = pd.read_parquet(ACTIVE_POOL)
+
+    # Load existing active annotations to skip already-done ones
+    done_texts: set[str] = set()
+    if os.path.exists(ANNOT_FILE):
+        done_all = pd.read_parquet(ANNOT_FILE)
+        active_done = done_all[done_all["source"].str.startswith("active_", na=False)]
+        done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
+
+    # Build annotation queue: low confidence OR high-conf figurative
+    queue = pool[
+        (pool["confidence"] < LOW_CONF) |
+        ((pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal"))
+    ].copy()
+    queue = queue[~queue["text_cree"].isin(done_texts)]
+
+    # Sort: figurative predictions first, then by ascending confidence
+    queue["_fig"] = queue["label"] != "literal"
+    queue = queue.sort_values(["_fig", "confidence"], ascending=[False, True])
+    queue = queue.drop(columns=["_fig"])
+
+    mode  = getattr(args, "mode",  "human")
+    batch = getattr(args, "batch", 20)
+    print(f"Annotation queue: {len(queue):,} sentences  "
+          f"(mode={mode}, batch={batch})")
+
+    annotated_rows = []
+    batch_df = queue.head(batch)
+
+    for _, row in batch_df.iterrows():
+        # Dictionary lookup
+        lookups = lookup_sentence(row["text_cree"], verbose=False)
+        prompt  = format_for_prompt(row["text_cree"], row["text_en"], lookups)
+        probs   = {l: row[f"prob_{l}"] for l in LABELS}
+
+        if mode == "human":
+            label = _human_annotate(prompt, probs)
+            if label is None:
+                continue
+        else:
+            print(f"  annotating: {row['text_cree'][:60]}...")
+            label = _deepseek_annotate_simple(prompt, probs)
+            print(f"    → {label}")
+
+        annotated_rows.append({
+            "text_cree":   row["text_cree"],
+            "text_en":     row["text_en"],
+            "label":       label,
+            "source":      f"active_{mode}",
+            "model_label": row["label"],
+            "confidence":  row["confidence"],
+        })
+
+    if not annotated_rows:
+        print("Nothing annotated.")
+        return
+
+    # Merge new annotations into the unified annotations file
+    new_df = pd.DataFrame(annotated_rows)
+    if os.path.exists(ANNOT_FILE):
+        existing = pd.read_parquet(ANNOT_FILE)
+        new_df = pd.concat([existing, new_df], ignore_index=True)
+    new_df.drop_duplicates(subset=["text_cree"], inplace=True)
+    new_df.to_parquet(ANNOT_FILE, index=False)
+    print(f"\nSaved {len(annotated_rows)} annotations → {ANNOT_FILE}")
+    label_dist = pd.Series([r["label"] for r in annotated_rows]).value_counts()
+    print(f"Distribution: {label_dist.to_dict()}")
+
+
+def cmd_retrain(args) -> None:
+    """Retrain calibration with expanded data (no wandb)."""
+    from funcs import calibrate
+
+    # Load unified annotations (contains both gold and active rows)
+    if not os.path.exists(ANNOT_FILE):
+        sys.exit(f"No annotations found at {ANNOT_FILE}. Run 'annotate' first.")
+    all_annot = pd.read_parquet(ANNOT_FILE)
+    is_active = all_annot["source"].str.startswith("active_", na=False)
+    gold   = all_annot[~is_active]
+    active = all_annot[is_active]
+
+    # Optionally also add high-confidence pseudo-labels
+    if os.path.exists(ACTIVE_POOL):
+        pool = pd.read_parquet(ACTIVE_POOL)
+        pseudo = pool[
+            (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
+        ][["text_cree", "text_en", "label"]].copy()
+        pseudo["source"] = "pseudo_label"
+        print(f"Adding {len(pseudo):,} high-confidence pseudo-labels")
+    else:
+        pseudo = pd.DataFrame(columns=["text_cree", "text_en", "label"])
+
+    # Merge: all annotations + pseudo
+    annotated_texts = set(all_annot["text_cree"].dropna().str.strip().tolist())
+    pseudo = pseudo[~pseudo["text_cree"].isin(annotated_texts)]
+    combined = pd.concat([
+        all_annot[["text_cree", "text_en", "label"]],
+        pseudo[["text_cree", "text_en", "label"]],
+    ], ignore_index=True).drop_duplicates(subset=["text_cree"])
+
+    print(f"\nTraining set: {len(combined):,} sentences "
+          f"(gold={len(gold):,}, active={len(active):,}, pseudo={len(pseudo):,})")
+    print(f"Label dist: {combined['label'].value_counts().to_dict()}")
+
+    # Write merged annotation file to temp location
+    tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
+    tmp.close()
+    combined.to_parquet(tmp.name, index=False)
+
+    checkpoint  = getattr(args, "checkpoint",   CALIBRATED_MODEL)
+    output_dir  = getattr(args, "output_dir",   "data/figurative/active_calibrated")
+    epochs      = getattr(args, "epochs",        15)
+    lr          = getattr(args, "lr",            3.78e-6)
+    literal_ratio = getattr(args, "literal_ratio", 5)
+
+    print(f"\nRetraining calibration from {checkpoint} ...")
+    calibrate(
+        checkpoint=checkpoint,
+        output_dir=output_dir,
+        annot_file=tmp.name,
+        epochs=epochs,
+        batch_size=8,
+        learning_rate=lr,
+        literal_ratio=literal_ratio,
+        max_length=128,
+        wandb_project="FNLP",
+    )
+    os.unlink(tmp.name)
+    print(f"\nRetrained model saved → {output_dir}")
+
+
+def cmd_status(_args) -> None:
+    """Show annotation progress (no wandb)."""
+    gold_n = active_n = 0
+    if os.path.exists(ANNOT_FILE):
+        all_annot = pd.read_parquet(ANNOT_FILE)
+        is_active = all_annot["source"].str.startswith("active_", na=False)
+        gold_n   = int((~is_active).sum())
+        active_n = int(is_active.sum())
+
+    pool_n = pseudo_n = queue_n = 0
+    if os.path.exists(ACTIVE_POOL):
+        pool = pd.read_parquet(ACTIVE_POOL)
+        pool_n  = len(pool)
+        queue_n = len(pool[pool["confidence"] < LOW_CONF])
+        pseudo_n = len(pool[
+            (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
+        ])
+
+    print(f"Gold annotations        : {gold_n:>5,}  ({ANNOT_FILE})")
+    print(f"Active annotations done : {active_n:>5,}  ({ANNOT_FILE})")
+    print(f"Unlabeled pool (inferred): {pool_n:>5,}  ({ACTIVE_POOL})")
+    print(f"  → annotation queue    : {queue_n:>5,}  (conf < {LOW_CONF})")
+    print(f"  → pseudo-label ready  : {pseudo_n:>5,}  (conf ≥ {HIGH_CONF}, figurative)")
+    print(f"Total for retrain       : {gold_n + active_n + pseudo_n:>5,}")
+
+
+# ── Full loop runner ───────────────────────────────────────────────────────────
+
+def run_loop(args) -> None:
+    """Run the full infer → annotate → retrain loop with wandb."""
     import wandb
     wandb.init(
         project=WANDB_PROJECT,
-        name=args.run_name,
+        name=getattr(args, "run_name", None),
         job_type="active-loop",
         config={
             "checkpoint":    args.checkpoint,
@@ -365,6 +619,77 @@ def main() -> None:
 
     wandb.finish()
     print("[active-loop] done.")
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd")
+
+    # ── Full loop subcommand (also the default when no subcommand given) ───────
+    loop_p = sub.add_parser("loop", help="Run full infer→annotate→retrain loop (default)")
+    loop_p.add_argument("--checkpoint",   default=CALIBRATED_MODEL,
+                        help="Model to run inference with and retrain from")
+    loop_p.add_argument("--skip-infer",   action="store_true",
+                        help="Skip inference — reuse existing active_pool.parquet")
+    loop_p.add_argument("--max-annotate", type=int, default=0,
+                        help="Max sentences to annotate (0 = all)")
+    loop_p.add_argument("--no-retrain",   action="store_true",
+                        help="Stop after annotation, do not retrain")
+    loop_p.add_argument("--output-dir",   default="data/figurative/active_calibrated")
+    loop_p.add_argument("--push-to-hub",  default=None, metavar="HUB_ID",
+                        help="Push retrained model to this Hub ID")
+    loop_p.add_argument("--epochs",       type=int,   default=15)
+    loop_p.add_argument("--lr",           type=float, default=3.78e-6)
+    loop_p.add_argument("--literal-ratio",type=int,   default=5)
+    loop_p.add_argument("--run-name",     default=None,
+                        help="wandb run name (default: auto)")
+
+    # ── Individual subcommands ─────────────────────────────────────────────────
+    infer_p = sub.add_parser("infer", help="Run inference on unlabeled pool")
+    infer_p.add_argument("--checkpoint", default=CALIBRATED_MODEL)
+
+    ann_p = sub.add_parser("annotate", help="Annotate low-confidence sentences")
+    ann_p.add_argument("--mode",  choices=["human", "deepseek"], default="human")
+    ann_p.add_argument("--batch", type=int, default=20,
+                       help="Sentences to annotate per session (default: 20)")
+
+    ret_p = sub.add_parser("retrain", help="Retrain calibration with expanded data")
+    ret_p.add_argument("--checkpoint",    default=CALIBRATED_MODEL)
+    ret_p.add_argument("--output-dir",    default="data/figurative/active_calibrated")
+    ret_p.add_argument("--epochs",        type=int,   default=15)
+    ret_p.add_argument("--lr",            type=float, default=3.78e-6)
+    ret_p.add_argument("--literal-ratio", type=int,   default=5)
+
+    sub.add_parser("status", help="Show annotation progress")
+
+    # ── For backwards compatibility: top-level loop flags (no subcommand) ─────
+    # These are forwarded to run_loop() when no subcommand is given.
+    p.add_argument("--checkpoint",   default=CALIBRATED_MODEL)
+    p.add_argument("--skip-infer",   action="store_true")
+    p.add_argument("--max-annotate", type=int, default=0)
+    p.add_argument("--no-retrain",   action="store_true")
+    p.add_argument("--output-dir",   default="data/figurative/active_calibrated")
+    p.add_argument("--push-to-hub",  default=None, metavar="HUB_ID")
+    p.add_argument("--epochs",       type=int,   default=15)
+    p.add_argument("--lr",           type=float, default=3.78e-6)
+    p.add_argument("--literal-ratio",type=int,   default=5)
+    p.add_argument("--run-name",     default=None)
+
+    args = p.parse_args()
+
+    if args.cmd is None or args.cmd == "loop":
+        run_loop(args)
+    elif args.cmd == "infer":
+        cmd_infer(args)
+    elif args.cmd == "annotate":
+        cmd_annotate(args)
+    elif args.cmd == "retrain":
+        cmd_retrain(args)
+    elif args.cmd == "status":
+        cmd_status(args)
 
 
 if __name__ == "__main__":

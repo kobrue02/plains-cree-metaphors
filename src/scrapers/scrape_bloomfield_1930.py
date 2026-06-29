@@ -10,8 +10,8 @@ preserved as-is (OCR artefacts included); the model sees the character
 patterns, not the orthography.
 
 Usage:
-  python scripts/scrape_bloomfield_1930.py --pdf <path>
-  python scripts/scrape_bloomfield_1930.py --pdf <path> --out data/sentences_bloomfield_1930.txt
+  python src/scrapers/scrape_bloomfield_1930.py --pdf <path>
+  python src/scrapers/scrape_bloomfield_1930.py --pdf <path> --out data/sentences_bloomfield_1930.txt
 """
 
 from __future__ import annotations
@@ -91,7 +91,24 @@ def _split_paragraphs(text: str) -> list[str]:
     return paras
 
 
-def extract_stories(full_text: str) -> list[dict]:
+def _find_en_split(paragraphs: list[str]) -> int:
+    """
+    Return the index of the first paragraph that is English.
+
+    Look for two consecutive English paragraphs to avoid false positives
+    from isolated English footnotes embedded in the Cree section.
+    """
+    for i in range(len(paragraphs) - 1):
+        if _is_english_para(paragraphs[i]) and _is_english_para(paragraphs[i + 1]):
+            return i
+    # Fallback: single English paragraph at the end
+    for i in range(len(paragraphs) - 1, -1, -1):
+        if _is_english_para(paragraphs[i]):
+            return i
+    return len(paragraphs)  # all Cree (shouldn't happen)
+
+
+def _extract_stories(full_text: str) -> list[dict]:
     """
     Find each story boundary, split into Cree + English paragraph blocks,
     and return a list of story dicts.
@@ -148,24 +165,7 @@ def extract_stories(full_text: str) -> list[dict]:
     return stories
 
 
-def _find_en_split(paragraphs: list[str]) -> int:
-    """
-    Return the index of the first paragraph that is English.
-
-    Look for two consecutive English paragraphs to avoid false positives
-    from isolated English footnotes embedded in the Cree section.
-    """
-    for i in range(len(paragraphs) - 1):
-        if _is_english_para(paragraphs[i]) and _is_english_para(paragraphs[i + 1]):
-            return i
-    # Fallback: single English paragraph at the end
-    for i in range(len(paragraphs) - 1, -1, -1):
-        if _is_english_para(paragraphs[i]):
-            return i
-    return len(paragraphs)  # all Cree (shouldn't happen)
-
-
-def align_pairs(
+def _align_pairs(
     stories: list[dict],
     max_para_diff: int = 6,
 ) -> list[tuple[str, str]]:
@@ -193,7 +193,7 @@ def align_pairs(
     return pairs
 
 
-def dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
+def _dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
     seen: set[str] = set()
     out = []
     for c, e in pairs:
@@ -202,6 +202,33 @@ def dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
             seen.add(key)
             out.append((c, e))
     return out
+
+
+def extract(pdf_path: str, max_para_diff: int = 6) -> list[tuple[str, str]]:
+    """Extract (cree, english) paragraph-aligned pairs from the Bloomfield 1930 PDF.
+
+    Parameters
+    ----------
+    pdf_path:
+        Path to the Bloomfield 1930 PDF file.
+    max_para_diff:
+        Only include stories where abs(len(cree_paras) - len(en_paras)) <= this value.
+
+    Returns
+    -------
+    list of (cree, english) tuples after deduplication.
+    """
+    try:
+        import fitz
+        doc  = fitz.open(pdf_path)
+        text = "\n".join(page.get_text("text", sort=True) for page in doc)
+    except ImportError:
+        raise ImportError("pymupdf not installed — run: uv sync")
+
+    stories = _extract_stories(text)
+    pairs = _align_pairs(stories, max_para_diff=max_para_diff)
+    pairs = _dedup(pairs)
+    return pairs
 
 
 def main() -> None:
@@ -232,18 +259,17 @@ def main() -> None:
         sys.exit(f"PDF not found: {args.pdf}")
 
     print(f"Extracting text from {args.pdf} ...")
-    try:
-        import fitz
-        doc  = fitz.open(args.pdf)
-        text = "\n".join(page.get_text("text", sort=True) for page in doc)
-    except ImportError:
-        sys.exit("pymupdf not installed — run: uv sync")
-
-    print("Identifying story boundaries ...")
-    stories = extract_stories(text)
-    print(f"  Found {len(stories)} stories")
 
     if args.stats:
+        # Need stories for stats printing — re-extract with intermediate data
+        try:
+            import fitz
+            doc  = fitz.open(args.pdf)
+            text = "\n".join(page.get_text("text", sort=True) for page in doc)
+        except ImportError:
+            sys.exit("pymupdf not installed — run: uv sync")
+        stories = _extract_stories(text)
+        print(f"  Found {len(stories)} stories")
         print(f"\n{'#':<4} {'Title':<50} {'Cree':>5} {'EN':>5} {'use?':>5}")
         print("─" * 76)
         for s in stories:
@@ -253,9 +279,11 @@ def main() -> None:
             use  = "yes" if diff <= args.max_para_diff else "skip"
             print(f"({s['number']:<2}) {s['title'][:48]:<48}  {nc:>4}  {ne:>4}  {use}")
         print()
-
-    pairs = align_pairs(stories, max_para_diff=args.max_para_diff)
-    pairs = dedup(pairs)
+        pairs = _align_pairs(stories, max_para_diff=args.max_para_diff)
+        pairs = _dedup(pairs)
+    else:
+        pairs = extract(args.pdf, max_para_diff=args.max_para_diff)
+        print(f"  Found pairs from PDF")
 
     os.makedirs(os.path.dirname(args.out) if os.path.dirname(args.out) else ".", exist_ok=True)
     with open(args.out, "w", encoding="utf-8") as f:
