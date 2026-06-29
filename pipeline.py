@@ -32,8 +32,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from funcs import fine_tune, figurative_distill, calibrate
 
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
-SENTENCES_FILE = "data/sentences_combined.txt"
-ANNOT_FILE     = "data/figurative/bloomfield_annotated.parquet"
+SENTENCES_FILE = "data/sentences.parquet"
+ANNOT_FILE     = "data/figurative/annotations.parquet"
 
 
 def hub_id(prefix: str, model_id: str, stage: str) -> str:

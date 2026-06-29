@@ -17,10 +17,9 @@ Modes
 
 Files
 -----
-  data/figurative/bloomfield_annotated.csv     — existing gold labels
-  data/bloomfield_texts_sentences.csv          — full sentence pool
-  data/figurative/active_pool.csv              — inference results on unlabeled
-  data/figurative/active_annotations.csv       — newly annotated sentences
+  data/figurative/annotations.parquet          — unified gold + active labels
+  data/bloomfield_texts_sentences.parquet      — full sentence pool
+  data/figurative/active_pool.parquet          — inference results on unlabeled
 """
 
 from __future__ import annotations
@@ -30,10 +29,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 CALIBRATED_MODEL = "KonradBRG/xlm-mlm-plains-cree-en-calibrated"
-ANNOT_FILE       = "data/figurative/bloomfield_annotated.parquet"
+ANNOT_FILE       = "data/figurative/annotations.parquet"
 POOL_FILE        = "data/bloomfield_texts_sentences.parquet"
 ACTIVE_POOL      = "data/figurative/active_pool.parquet"
-ACTIVE_ANNOT     = "data/figurative/active_annotations.parquet"
 LABELS           = ["literal", "idiom", "metaphor", "simile"]
 
 # Confidence thresholds
@@ -156,9 +154,10 @@ def cmd_annotate(args) -> None:
 
     # Load existing active annotations to skip already-done ones
     done_texts: set[str] = set()
-    if os.path.exists(ACTIVE_ANNOT):
-        done = pd.read_parquet(ACTIVE_ANNOT)
-        done_texts = set(done["text_cree"].dropna().str.strip().tolist())
+    if os.path.exists(ANNOT_FILE):
+        done_all = pd.read_parquet(ANNOT_FILE)
+        active_done = done_all[done_all["source"].str.startswith("active_", na=False)]
+        done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
 
     # Build annotation queue: low confidence OR high-conf figurative
     queue = pool[
@@ -206,13 +205,14 @@ def cmd_annotate(args) -> None:
         print("Nothing annotated.")
         return
 
-    # Append to active annotations file
+    # Merge new annotations into the unified annotations file
     new_df = pd.DataFrame(annotated_rows)
-    if os.path.exists(ACTIVE_ANNOT):
-        existing = pd.read_parquet(ACTIVE_ANNOT)
+    if os.path.exists(ANNOT_FILE):
+        existing = pd.read_parquet(ANNOT_FILE)
         new_df = pd.concat([existing, new_df], ignore_index=True)
-    new_df.to_parquet(ACTIVE_ANNOT, index=False)
-    print(f"\nSaved {len(annotated_rows)} annotations → {ACTIVE_ANNOT}")
+    new_df.drop_duplicates(subset=["text_cree"], inplace=True)
+    new_df.to_parquet(ANNOT_FILE, index=False)
+    print(f"\nSaved {len(annotated_rows)} annotations → {ANNOT_FILE}")
     label_dist = pd.Series([r["label"] for r in annotated_rows]).value_counts()
     print(f"Distribution: {label_dist.to_dict()}")
 
@@ -223,13 +223,13 @@ def cmd_retrain(args) -> None:
     import tempfile
     from funcs import calibrate
 
-    # Load gold labels
-    gold = pd.read_parquet(ANNOT_FILE)
-
-    # Load active annotations
-    if not os.path.exists(ACTIVE_ANNOT):
-        sys.exit(f"No active annotations found at {ACTIVE_ANNOT}. Run 'annotate' first.")
-    active = pd.read_parquet(ACTIVE_ANNOT)
+    # Load unified annotations (contains both gold and active rows)
+    if not os.path.exists(ANNOT_FILE):
+        sys.exit(f"No annotations found at {ANNOT_FILE}. Run 'annotate' first.")
+    all_annot = pd.read_parquet(ANNOT_FILE)
+    is_active = all_annot["source"].str.startswith("active_", na=False)
+    gold   = all_annot[~is_active]
+    active = all_annot[is_active]
 
     # Optionally also add high-confidence pseudo-labels
     if os.path.exists(ACTIVE_POOL):
@@ -242,10 +242,11 @@ def cmd_retrain(args) -> None:
     else:
         pseudo = pd.DataFrame(columns=["text_cree", "text_en", "label"])
 
-    # Merge: gold + active + pseudo
+    # Merge: all annotations + pseudo
+    annotated_texts = set(all_annot["text_cree"].dropna().str.strip().tolist())
+    pseudo = pseudo[~pseudo["text_cree"].isin(annotated_texts)]
     combined = pd.concat([
-        gold[["text_cree", "text_en", "label"]],
-        active[["text_cree", "text_en", "label"]],
+        all_annot[["text_cree", "text_en", "label"]],
         pseudo[["text_cree", "text_en", "label"]],
     ], ignore_index=True).drop_duplicates(subset=["text_cree"])
 
@@ -277,10 +278,14 @@ def cmd_retrain(args) -> None:
 # ── 4. STATUS ─────────────────────────────────────────────────────────────────
 
 def cmd_status(_args) -> None:
-    gold_n = len(pd.read_parquet(ANNOT_FILE)) \
-        if os.path.exists(ANNOT_FILE) else 0
+    gold_n = active_n = 0
+    if os.path.exists(ANNOT_FILE):
+        all_annot = pd.read_parquet(ANNOT_FILE)
+        is_active = all_annot["source"].str.startswith("active_", na=False)
+        gold_n   = int((~is_active).sum())
+        active_n = int(is_active.sum())
 
-    pool_n = annot_n = pseudo_n = queue_n = 0
+    pool_n = pseudo_n = queue_n = 0
     if os.path.exists(ACTIVE_POOL):
         pool = pd.read_parquet(ACTIVE_POOL)
         pool_n  = len(pool)
@@ -288,15 +293,13 @@ def cmd_status(_args) -> None:
         pseudo_n = len(pool[
             (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
         ])
-    if os.path.exists(ACTIVE_ANNOT):
-        annot_n = len(pd.read_parquet(ACTIVE_ANNOT))
 
     print(f"Gold annotations        : {gold_n:>5,}  ({ANNOT_FILE})")
+    print(f"Active annotations done : {active_n:>5,}  ({ANNOT_FILE})")
     print(f"Unlabeled pool (inferred): {pool_n:>5,}  ({ACTIVE_POOL})")
     print(f"  → annotation queue    : {queue_n:>5,}  (conf < {LOW_CONF})")
     print(f"  → pseudo-label ready  : {pseudo_n:>5,}  (conf ≥ {HIGH_CONF}, figurative)")
-    print(f"Active annotations done : {annot_n:>5,}  ({ACTIVE_ANNOT})")
-    print(f"Total for retrain       : {gold_n + annot_n + pseudo_n:>5,}")
+    print(f"Total for retrain       : {gold_n + active_n + pseudo_n:>5,}")
 
 
 # ── CLI ────────────────────────────────────────────────────────────────────────

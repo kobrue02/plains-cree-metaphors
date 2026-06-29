@@ -92,13 +92,7 @@ def fine_tune(
 ) -> str:
     """ Fine-tune a TLM model on Cree-English sentence pairs and return the checkpoint path."""
     if sentences_file:
-        sent_df = pd.read_csv(
-            sentences_file,
-            sep=r"\s*\|\|\|\s*",
-            header=None,
-            names=["text_cree", "text_en"],
-            engine="python",
-        )
+        sent_df = pd.read_parquet(sentences_file)
         print(f"Loaded {len(sent_df):,} pairs from {sentences_file}")
     else:
         df      = pd.read_parquet("data/bloomfield_texts.parquet")
@@ -175,7 +169,7 @@ def calibrate(
     output_dir:   str        = "data/calibrated",
     hub_model_id: str | None = None,
     wandb_project: str | None = None,
-    annot_file:   str        = "data/figurative/bloomfield_annotated.parquet",
+    annot_file:   str        = "data/figurative/annotations.parquet",
     epochs:       int        = 10,
     batch_size:   int        = 8,
     learning_rate: float     = 5e-6,

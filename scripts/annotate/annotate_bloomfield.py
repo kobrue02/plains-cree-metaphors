@@ -8,7 +8,7 @@ into our 4-class scheme, then assigns a label to each sentence in the paragraph.
 Only the ~420 footnoted paragraphs are sent to the API. The remaining ~5000
 paragraphs are left for CLKD-based silver annotation.
 
-Output: data/figurative/bloomfield_annotated.csv
+Output: data/figurative/annotations.parquet
 Resume-safe: progress is checkpointed to data/figurative/annotation_cache.jsonl
 """
 
@@ -21,7 +21,7 @@ from src.annotate.deepseek import client, MODEL_ID
 
 TEXTS_CSV   = "data/bloomfield_texts.parquet"
 SENTS_CSV   = "data/bloomfield_texts_sentences.parquet"
-OUTPUT_CSV  = "data/figurative/bloomfield_annotated.parquet"
+OUTPUT_CSV  = "data/figurative/annotations.parquet"
 CACHE_JSONL = "data/figurative/annotation_cache.jsonl"
 
 LABEL_MAP = {
@@ -197,7 +197,7 @@ def main(limit: int | None = None) -> None:
             rows_out.append({
                 "paragraph_id":    pid,
                 "sentence_id":     sent_row["sentence_id"],
-                "source_file":     para.get("source_file", ""),
+                "source":          para.get("source_file", ""),
                 "text_cree":       sent_row["text_cree"],
                 "text_en":         sent_row["text_en"],
                 "label":           LABEL_MAP.get(raw_lbl, "literal"),

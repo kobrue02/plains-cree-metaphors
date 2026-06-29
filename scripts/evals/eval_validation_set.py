@@ -1,7 +1,7 @@
 """
 Evaluate CLKD models against DeepSeek-annotated validation set.
 
-Ground truth: data/figurative/bloomfield_annotated.csv
+Ground truth: data/figurative/annotations.parquet
   - ~1,225 sentences from footnoted Bloomfield paragraphs
   - Labels assigned by DeepSeek R1 using Bloomfield's own footnotes as primary signal
   - `footnote_applies=True` marks the 35 sentences where Bloomfield directly
@@ -29,7 +29,7 @@ from sklearn.metrics import classification_report, f1_score
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-ANNOT_FILE   = "data/figurative/bloomfield_annotated.parquet"
+ANNOT_FILE   = "data/figurative/annotations.parquet"
 OUTPUT_FULL  = "data/figurative/eval_validation_full.csv"
 OUTPUT_GOLD  = "data/figurative/eval_validation_gold.csv"
 

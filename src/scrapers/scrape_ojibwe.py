@@ -204,6 +204,16 @@ def to_parallel(stories: list[Story], out_path: str | Path) -> None:
                 f.write(f"{oji} ||| {eng}\n")
 
 
+def to_parallel_df(stories: list[Story]) -> "pd.DataFrame":
+    """Return a DataFrame with text_cree and text_en columns (no file I/O)."""
+    import pandas as pd
+    rows = []
+    for story in stories:
+        for oji, eng in zip(story.ojibwe, story.english):
+            rows.append({"text_cree": oji, "text_en": eng})
+    return pd.DataFrame(rows)
+
+
 # ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":

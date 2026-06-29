@@ -110,7 +110,7 @@ def main() -> None:
     print(f"Pool: {len(pool):,} existing sentences")
 
     # Also skip anything already in the gold set
-    gold_file = "data/figurative/bloomfield_annotated.parquet"
+    gold_file = "data/figurative/annotations.parquet"
     if os.path.exists(gold_file):
         gold = pd.read_parquet(gold_file)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())

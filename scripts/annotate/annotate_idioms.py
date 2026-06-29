@@ -1,9 +1,9 @@
 """
 Scan the unlabeled pool for sentences containing known Plains Cree idioms
-and append them to bloomfield_annotated.csv as gold idiom labels.
+and append them to annotations.parquet as gold idiom labels.
 
 Usage:
-  python scripts/annotate_idioms.py [--pool data/figurative/active_pool.csv]
+  python scripts/annotate_idioms.py [--pool data/figurative/active_pool.parquet]
   python scripts/annotate_idioms.py --dry-run
 """
 
@@ -15,7 +15,7 @@ import pandas as pd
 
 IDIOMS_FILE = "data/idioms.txt"
 POOL_FILE   = "data/figurative/active_pool.parquet"
-ANNOT_FILE  = "data/figurative/bloomfield_annotated.parquet"
+ANNOT_FILE  = "data/figurative/annotations.parquet"
 
 
 def load_idioms(path: str) -> list[tuple[str, str]]:
@@ -57,7 +57,7 @@ def main() -> None:
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--pool",    default=POOL_FILE)
     p.add_argument("--dry-run", action="store_true",
-                   help="Print matches without writing to bloomfield_annotated.csv")
+                   help="Print matches without writing to annotations.parquet")
     args = p.parse_args()
 
     idioms = load_idioms(IDIOMS_FILE)
@@ -93,11 +93,11 @@ def main() -> None:
                 print(f"  [{r['idiom_phrase']}] {r['text_cree'][:80]}")
         return
 
-    # Build rows that match bloomfield_annotated.csv schema
+    # Build rows that match annotations.parquet schema
     new_rows = pd.DataFrame([{
         "paragraph_id":    None,
         "sentence_id":     None,
-        "source_file":     "idioms.txt",
+        "source":          "idioms.txt",
         "text_cree":       r["text_cree"],
         "text_en":         r["text_en"],
         "label":           "idiom",

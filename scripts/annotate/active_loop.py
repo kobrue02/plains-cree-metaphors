@@ -30,10 +30,9 @@ import pandas as pd
 
 WANDB_PROJECT    = "FNLP"
 CALIBRATED_MODEL = "KonradBRG/xlm-mlm-plains-cree-en-calibrated"
-ANNOT_FILE       = "data/figurative/bloomfield_annotated.parquet"
+ANNOT_FILE       = "data/figurative/annotations.parquet"
 POOL_FILE        = "data/bloomfield_texts_sentences.parquet"
 ACTIVE_POOL      = "data/figurative/active_pool.parquet"
-ACTIVE_ANNOT     = "data/figurative/active_annotations.parquet"
 LABELS           = ["literal", "idiom", "metaphor", "simile"]
 
 HIGH_CONF = 0.90
@@ -151,11 +150,12 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     # pseudo-labels in phase_retrain and should not be second-guessed by DeepSeek
     queue = pool[pool["confidence"] < LOW_CONF].copy()
 
-    # Skip already-annotated
+    # Skip already-annotated (active_deepseek rows in the unified annotations file)
     done_texts: set[str] = set()
-    if os.path.exists(ACTIVE_ANNOT):
-        done = pd.read_parquet(ACTIVE_ANNOT)
-        done_texts = set(done["text_cree"].dropna().str.strip().tolist())
+    if os.path.exists(ANNOT_FILE):
+        done_all = pd.read_parquet(ANNOT_FILE)
+        active_done = done_all[done_all["source"] == "active_deepseek"]
+        done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
         queue = queue[~queue["text_cree"].isin(done_texts)]
 
     # Figurative predictions first, then ascending confidence
@@ -207,12 +207,13 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
 
     new_df = pd.DataFrame(rows)
 
-    # Merge with any existing active annotations
-    if os.path.exists(ACTIVE_ANNOT) and done_texts:
-        existing = pd.read_parquet(ACTIVE_ANNOT)
+    # Merge new active annotations into the unified annotations file
+    if os.path.exists(ANNOT_FILE):
+        existing = pd.read_parquet(ANNOT_FILE)
         new_df = pd.concat([existing, new_df], ignore_index=True)
 
-    new_df.to_parquet(ACTIVE_ANNOT, index=False)
+    new_df.drop_duplicates(subset=["text_cree"], inplace=True)
+    new_df.to_parquet(ANNOT_FILE, index=False)
 
     overall_agreement = sum(agreements) / len(agreements) if agreements else 0.0
     wandb.log({
@@ -240,8 +241,10 @@ def phase_retrain(
     import wandb
     from funcs import calibrate
 
-    gold   = pd.read_parquet(ANNOT_FILE)
-    active = pd.read_parquet(ACTIVE_ANNOT)
+    # Unified annotations file contains both gold (bloomfield) and active rows
+    all_annot = pd.read_parquet(ANNOT_FILE)
+    gold   = all_annot[all_annot["source"] != "active_deepseek"]
+    active = all_annot[all_annot["source"] == "active_deepseek"]
 
     # High-confidence figurative predictions → pseudo-labels
     pool   = pd.read_parquet(ACTIVE_POOL)
@@ -249,13 +252,12 @@ def phase_retrain(
         (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
     ][["text_cree", "text_en", "label"]].copy()
 
-    # Remove pseudo-label candidates already in active annotations
-    active_texts = set(active["text_cree"].dropna().str.strip().tolist())
-    pseudo = pseudo[~pseudo["text_cree"].isin(active_texts)]
+    # Remove pseudo-label candidates already annotated
+    annotated_texts = set(all_annot["text_cree"].dropna().str.strip().tolist())
+    pseudo = pseudo[~pseudo["text_cree"].isin(annotated_texts)]
 
     combined = pd.concat([
-        gold[["text_cree", "text_en", "label"]],
-        active[["text_cree", "text_en", "label"]],
+        all_annot[["text_cree", "text_en", "label"]],
         pseudo[["text_cree", "text_en", "label"]],
     ], ignore_index=True).drop_duplicates(subset=["text_cree"])
 
@@ -304,7 +306,7 @@ def main() -> None:
     p.add_argument("--checkpoint",   default=CALIBRATED_MODEL,
                    help="Model to run inference with and retrain from")
     p.add_argument("--skip-infer",   action="store_true",
-                   help="Skip inference — reuse existing active_pool.csv")
+                   help="Skip inference — reuse existing active_pool.parquet")
     p.add_argument("--max-annotate", type=int, default=0,
                    help="Max sentences to annotate (0 = all)")
     p.add_argument("--no-retrain",   action="store_true",
