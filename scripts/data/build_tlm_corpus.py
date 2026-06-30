@@ -9,7 +9,7 @@ Output files:
       "edtekla"           — Plains Cree-English (Teodorescu et al. 2022)
       "ojibwe"            — Ojibwe-English (Jones & Michelson 1917)
       "okimasis"          — Plains Cree-English (Okimāsis 2018 textbook)
-      "bloomfield_1930"   — Plains Cree-English (Bloomfield 1930, paragraph-aligned)
+      "bloomfield_1930"   — Plains Cree-English (Bloomfield 1930, from DJVU text export)
 
 Usage:
   python scripts/build_tlm_corpus.py
@@ -30,7 +30,7 @@ BLOOMFIELD_CSV   = "data/bloomfield_texts.parquet"
 BLOOMFIELD_SENTS = "data/bloomfield_texts_sentences.parquet"
 OJIBWE_TXT       = "data/ojibwatextscoll07jonerich_djvu.txt"
 OKIMASIS_PDF        = "data/creelanguageoftheplainstextbook.pdf"
-BLOOMFIELD_1930_PDF = "data/sacred-stories-bloomfield-1930.pdf"
+BLOOMFIELD_1930_TXT = "data/P005409_djvu.txt"
 SENTENCES_OUT       = "data/sentences.parquet"
 
 
@@ -130,16 +130,16 @@ def main() -> None:
     # Bloomfield 1930
     pairs_1930: list[tuple[str, str]] = []
     if not args.skip_bloomfield_1930:
-        if os.path.exists(BLOOMFIELD_1930_PDF):
+        if os.path.exists(BLOOMFIELD_1930_TXT):
             from src.scrapers.scrape_bloomfield_1930 import extract
             print("\nExtracting Bloomfield (1930) paragraph pairs ...")
-            pairs_1930 = extract(BLOOMFIELD_1930_PDF)
+            pairs_1930 = extract(BLOOMFIELD_1930_TXT)
             df_1930 = pd.DataFrame(pairs_1930, columns=["text_cree", "text_en"])
             df_1930["source"] = "bloomfield_1930"
             dfs.append(df_1930)
             print(f"  Bloomfield (1930): {len(pairs_1930)} pairs")
         else:
-            print(f"Bloomfield 1930: PDF not found at {BLOOMFIELD_1930_PDF}, skipping")
+            print(f"Bloomfield 1930: text file not found at {BLOOMFIELD_1930_TXT}, skipping")
             dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
     else:
         print("Bloomfield 1930: skipped (--skip-bloomfield-1930)")
