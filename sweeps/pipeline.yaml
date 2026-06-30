@@ -1,0 +1,61 @@
+# Joint CLKD + Calibrate sweep.
+#
+# CLKD freeze_n_layers and calibrate_lr are tightly coupled: the less the
+# CLKD model adapts to Cree (more frozen layers), the more aggressive the
+# calibration LR needs to be. Sweeping them together finds combinations that
+# work end-to-end, not just each stage in isolation.
+#
+# TLM is fixed (too expensive per trial). Set --tlm-ckpt to your best TLM
+# checkpoint or the Hub model before creating this sweep.
+#
+# Per-trial cost: ~1.5–3h on A100 (CLKD ~1–2h, calibrate ~15–30min).
+# Use gpu_a100_il partition.
+#
+# Create:  wandb sweep sweeps/pipeline.yaml   →  prints <entity/project/sweep_id>
+# Run:     for i in $(seq 1 N); do sbatch jobs/sweep_agent.sh <sweep_id>; done
+# Best:    use wandb UI; sort by eval/macro_f1 descending
+
+project: FNLP
+program: tune.py
+method: bayes
+metric:
+  name: eval/macro_f1
+  goal: maximize
+early_terminate:
+  type: hyperband
+  min_iter: 3
+
+parameters:
+  clkd_lr:
+    distribution: log_uniform_values
+    min: 5.0e-6
+    max: 1.0e-4
+  clkd_temperature:
+    values: [2, 4, 6]
+  clkd_freeze_layers:
+    values: [0, 2, 4, 6, 8, 12]
+  clkd_epochs:
+    values: [5, 8]
+  calibrate_lr:
+    distribution: log_uniform_values
+    min: 5.0e-7
+    max: 5.0e-5
+  calibrate_literal_ratio:
+    values: [1, 2, 3, 5]
+  calibrate_epochs:
+    values: [10, 15, 20]
+
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --stage
+  - pipeline
+  - --tlm-ckpt
+  - KonradBRG/xlm-mlm-plains-cree-en-tlm
+  - --output-dir
+  - data/sweep_pipeline_trial
+  - --batch-size
+  - "8"
+  - --max-length
+  - "128"

@@ -9,10 +9,11 @@ Metrics optimised per stage:
   tlm       → eval/loss       (minimize)  — TLM held-out MLM/TLM loss
   clkd      → eval/kl_epoch   (minimize)  — held-out KL on 10% corpus split
   calibrate → eval/macro_f1   (maximize)  — macro F1 on held-out annotation split
+  pipeline  → eval/macro_f1   (maximize)  — joint CLKD+Calibrate sweep (recommended)
 
 Usage:
   # 1. Create a sweep (once per stage):
-  wandb sweep sweeps/calibrate.yaml          # prints <entity/project/sweep_id>
+  wandb sweep sweeps/pipeline.yaml           # prints <entity/project/sweep_id>
 
   # 2. Submit N parallel agents on the cluster:
   sbatch jobs/sweep_agent.sh <sweep_id>      # repeat for desired parallelism
@@ -29,9 +30,9 @@ import wandb
 
 WANDB_PROJECT  = "FNLP"
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
-SENTENCES_FILE = "data/sentences_combined.txt"
-CORPUS_FILE    = "data/bloomfield_texts_sentences.csv"
-ANNOT_FILE     = "data/figurative/bloomfield_annotated.csv"
+SENTENCES_FILE = "data/sentences.parquet"
+CORPUS_FILE    = "data/bloomfield_texts_sentences.parquet"
+ANNOT_FILE     = "data/figurative/annotations.parquet"
 
 
 # ── Stage runners ──────────────────────────────────────────────────────────────
@@ -89,8 +90,60 @@ def run_calibrate(args: argparse.Namespace) -> None:
         literal_ratio=cfg.get("literal_ratio", 3),
         max_length=args.max_length,
         gold_only=args.gold_only,
-        wandb_project=WANDB_PROJECT,  # non-None so Trainer uses report_to="wandb"
+        wandb_project=WANDB_PROJECT,
     )
+
+
+def run_pipeline(args: argparse.Namespace) -> None:
+    """Joint CLKD → Calibrate sweep trial.
+
+    CLKD and Calibrate are coupled: freeze_n_layers determines how adapted the
+    model is to Cree, which determines how much LR calibration needs to move it.
+    Sweeping them jointly finds configs that work together, not in isolation.
+
+    Both stages log to the same wandb run. The sweep metric (eval/macro_f1) is
+    the final value logged by the calibration Trainer. Intermediate outputs are
+    deleted to keep disk usage bounded.
+    """
+    import shutil
+    from funcs import figurative_distill, calibrate
+
+    wandb.init(project=WANDB_PROJECT)
+    cfg = wandb.config
+    run_id = wandb.run.id
+
+    clkd_dir = f"{args.output_dir}_clkd_{run_id}"
+    cal_dir  = f"{args.output_dir}_cal_{run_id}"
+
+    try:
+        figurative_distill(
+            checkpoint=args.tlm_ckpt,
+            teacher_checkpoint=args.teacher,
+            mode="clkd",
+            corpus_file=args.corpus_file,
+            epochs=int(cfg.get("clkd_epochs", 5)),
+            batch_size=args.batch_size,
+            learning_rate=float(cfg.get("clkd_lr", 5e-6)),
+            temperature=float(cfg.get("clkd_temperature", 4.0)),
+            freeze_n_layers=int(cfg.get("clkd_freeze_layers", 6)),
+            output_dir=clkd_dir,
+            wandb_project=WANDB_PROJECT,
+        )
+        calibrate(
+            checkpoint=clkd_dir,
+            output_dir=cal_dir,
+            annot_file=args.annot_file,
+            epochs=int(cfg.get("calibrate_epochs", 15)),
+            batch_size=args.batch_size,
+            learning_rate=float(cfg.get("calibrate_lr", 5e-6)),
+            literal_ratio=int(cfg.get("calibrate_literal_ratio", 3)),
+            max_length=args.max_length,
+            gold_only=args.gold_only,
+            wandb_project=WANDB_PROJECT,
+        )
+    finally:
+        shutil.rmtree(clkd_dir, ignore_errors=True)
+        shutil.rmtree(cal_dir, ignore_errors=True)
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
@@ -101,7 +154,7 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    p.add_argument("--stage", required=True, choices=["tlm", "clkd", "calibrate"])
+    p.add_argument("--stage", required=True, choices=["tlm", "clkd", "calibrate", "pipeline"])
 
     # Input checkpoints (fixed across all trials for a given sweep)
     p.add_argument("--base-model",   default="FacebookAI/xlm-mlm-100-1280",
@@ -133,6 +186,10 @@ def main() -> None:
         if not args.clkd_ckpt:
             p.error("--clkd-ckpt is required for --stage calibrate")
         run_calibrate(args)
+    elif args.stage == "pipeline":
+        if not args.tlm_ckpt:
+            p.error("--tlm-ckpt is required for --stage pipeline")
+        run_pipeline(args)
 
 
 if __name__ == "__main__":
