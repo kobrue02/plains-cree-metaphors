@@ -2,12 +2,18 @@
 Fetch the best run from a wandb sweep and save its config.
 
 Usage:
-  python3 scripts/best_sweep_config.py <sweep_id>
-  python3 scripts/best_sweep_config.py konradbrg-uni/FNLP/0cvfxt6y
+  python3 scripts/train/best_sweep_config.py <sweep_id>
+  python3 scripts/train/best_sweep_config.py konradbrg-uni/FNLP/0cvfxt6y
+
+  # Execute the pipeline directly with the best config:
+  python3 scripts/train/best_sweep_config.py <sweep_id> --run
+
+  # Submit to the cluster instead:
+  python3 scripts/train/best_sweep_config.py <sweep_id> --sbatch
 
 Outputs:
   data/sweep_best/<sweep_id>.json   — best hyperparameters + metric
-  Prints a ready-to-use pipeline.py command.
+  Prints (and optionally runs) a ready-to-use pipeline.py command.
 """
 
 from __future__ import annotations
@@ -38,13 +44,22 @@ STAGE_FLAGS = {
         "grad_accum":     "--grad-accum",
         "sentences_file": "--sentences-file",
     },
+    "pipeline": {
+        "clkd_lr":                 "--clkd-lr",
+        "clkd_epochs":             "--clkd-epochs",
+        "clkd_temperature":        "--clkd-temperature",
+        "clkd_freeze_layers":      "--freeze-layers",
+        "calibrate_lr":            "--calibrate-lr",
+        "calibrate_epochs":        "--calibrate-epochs",
+        "calibrate_literal_ratio": "--literal-ratio",
+    },
 }
 
-METRIC = "eval/macro_f1"   # for calibrate
 METRIC_FALLBACK = {
     "calibrate": "eval/macro_f1",
     "clkd":      "eval/kl_epoch",
     "tlm":       "eval/loss",
+    "pipeline":  "eval/macro_f1",
 }
 
 
@@ -52,9 +67,11 @@ def _infer_stage(run) -> str:
     """Guess the stage from the run command or config."""
     cmd = getattr(run, "metadata", {}).get("args", [])
     for c in cmd:
-        if c in ("calibrate", "clkd", "tlm"):
+        if c in ("calibrate", "clkd", "tlm", "pipeline"):
             return c
     cfg = dict(run.config)
+    if "clkd_lr" in cfg or "calibrate_lr" in cfg:
+        return "pipeline"
     if "literal_ratio" in cfg:
         return "calibrate"
     if "temperature" in cfg or "freeze_n_layers" in cfg:
@@ -76,8 +93,8 @@ def fetch_best(sweep_path: str) -> dict:
         sys.exit("No completed runs in this sweep yet.")
 
     stage = _infer_stage(runs[0])
-    metric_key = METRIC_FALLBACK.get(stage, METRIC)
-    higher_is_better = stage == "calibrate"
+    metric_key = METRIC_FALLBACK.get(stage, "eval/macro_f1")
+    higher_is_better = stage in ("calibrate", "pipeline")
 
     def score(run):
         val = run.summary.get(metric_key)
@@ -104,18 +121,20 @@ def fetch_best(sweep_path: str) -> dict:
     }
 
 
-def build_pipeline_cmd(result: dict) -> str:
+def build_pipeline_cmd(result: dict, use_sbatch: bool = False) -> str:
     stage = result["stage"]
     cfg = result["config"]
     flags = STAGE_FLAGS.get(stage, {})
 
-    parts = ["python3 pipeline.py"]
+    prefix = "sbatch jobs/pipeline.sh" if use_sbatch else "python3 pipeline.py"
+    parts = [prefix]
 
-    # Stage skips (run only the relevant stage)
+    # Stage skips — only run the stages that were actually swept
     skip_map = {
         "calibrate": ["--skip-tlm", "--skip-clkd"],
         "clkd":      ["--skip-tlm", "--skip-calibrate"],
         "tlm":       ["--skip-clkd", "--skip-calibrate"],
+        "pipeline":  ["--skip-tlm"],  # TLM fixed; sweep covers CLKD + Calibrate
     }
     parts += skip_map.get(stage, [])
 
@@ -137,7 +156,14 @@ def main():
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("sweep_id", help="Sweep path, e.g. konradbrg-uni/FNLP/0cvfxt6y")
     p.add_argument("--out-dir", default="data/sweep_best")
+    p.add_argument("--run",    action="store_true",
+                   help="Execute pipeline.py with the best config immediately")
+    p.add_argument("--sbatch", action="store_true",
+                   help="Submit jobs/pipeline.sh with the best config via sbatch")
     args = p.parse_args()
+
+    if args.run and args.sbatch:
+        p.error("--run and --sbatch are mutually exclusive")
 
     print(f"Fetching sweep: {args.sweep_id} ...")
     result = fetch_best(args.sweep_id)
@@ -160,9 +186,15 @@ def main():
         print(f"    {k:<20} {v}")
     print(f"\n  Saved → {out_path}")
     print(f"{'─'*60}")
-    print(f"\nRun with best config:\n")
-    print(f"  {build_pipeline_cmd(result)}")
-    print()
+
+    cmd = build_pipeline_cmd(result, use_sbatch=args.sbatch)
+
+    if args.run or args.sbatch:
+        print(f"\n{'sbatch' if args.sbatch else 'Running'}:\n\n  {cmd}\n")
+        import subprocess
+        subprocess.run(cmd, shell=True, check=True)
+    else:
+        print(f"\nRun with best config:\n\n  {cmd}\n")
 
 
 if __name__ == "__main__":
