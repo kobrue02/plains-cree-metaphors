@@ -64,6 +64,14 @@ def main() -> None:
     p.add_argument("--skip-clkd",      action="store_true", help="Skip CLKD stage")
     p.add_argument("--skip-calibrate", action="store_true", help="Skip calibration stage")
 
+    # ablation overrides — inject a specific checkpoint as the starting point for
+    # CLKD or calibration, bypassing whatever the preceding stage produced.
+    # Use these to run ablations without modifying the main checkpoint dirs.
+    p.add_argument("--clkd-from",      default=None, metavar="CKPT",
+                   help="Override the input checkpoint for CLKD (e.g. the base model)")
+    p.add_argument("--calibrate-from", default=None, metavar="CKPT",
+                   help="Override the input checkpoint for calibration (e.g. TLM or base model)")
+
     # push behaviour
     p.add_argument("--push-intermediates", action="store_true",
                    help="Also push TLM and CLKD checkpoints to Hub (calibrated is always pushed)")
@@ -134,9 +142,10 @@ def main() -> None:
 
     # ── Stage 2: CLKD ─────────────────────────────────────────────────────────
     if not args.skip_clkd:
-        print(f"\n{'='*60}\n  Stage 2 · CLKD  ({tlm_ckpt})\n{'='*60}")
+        clkd_input = args.clkd_from if args.clkd_from else tlm_ckpt
+        print(f"\n{'='*60}\n  Stage 2 · CLKD  ({clkd_input})\n{'='*60}")
         figurative_distill(
-            checkpoint=tlm_ckpt,
+            checkpoint=clkd_input,
             teacher_checkpoint=args.teacher,
             freeze_n_layers=args.freeze_layers,
             mode="clkd",
@@ -156,9 +165,10 @@ def main() -> None:
 
     # ── Stage 3: Calibrate ────────────────────────────────────────────────────
     if not args.skip_calibrate:
-        print(f"\n{'='*60}\n  Stage 3 · Calibrate  ({clkd_ckpt})\n{'='*60}")
+        cal_input = args.calibrate_from if args.calibrate_from else clkd_ckpt
+        print(f"\n{'='*60}\n  Stage 3 · Calibrate  ({cal_input})\n{'='*60}")
         calibrate(
-            checkpoint=clkd_ckpt,
+            checkpoint=cal_input,
             output_dir=cal_local,
             hub_model_id=cal_hub,
             annot_file=args.annot_file,
