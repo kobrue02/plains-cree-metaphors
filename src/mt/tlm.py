@@ -10,10 +10,12 @@ space as English.
 from __future__ import annotations
 import os
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pandas as pd
 import torch
+import torch.nn.functional as F
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 from transformers import (
     AutoModelForMaskedLM,
@@ -43,6 +45,10 @@ class TLMConfig:
     seed:            int   = 42
     hub_model_id:    str | None = None
     wandb_project:   str | None = None  # e.g. "fnlp-tlm"; set to None to disable
+    # InfoNCE contrastive alignment — set alpha > 0 to enable.
+    # Each batch encodes src and tgt separately and adds InfoNCE to the MLM loss.
+    contrastive_alpha:       float = 0.0   # weight on InfoNCE term; 0 = pure TLM
+    contrastive_temperature: float = 0.05  # softmax temperature for InfoNCE
 
 
 class TLMDataset(Dataset):
@@ -59,8 +65,10 @@ class TLMDataset(Dataset):
         pairs:      list[tuple[str, str]],
         tokenizer,
         max_length: int,
+        with_contrastive: bool = False,
     ):
         self.examples: list[dict] = []
+        mono_len = max_length // 2  # individual sentence budget
         for src, tgt in pairs:
             enc = tokenizer(
                 src, tgt,
@@ -76,6 +84,17 @@ class TLMDataset(Dataset):
             # distinguish the two language segments, so keep them when present.
             if enc.get("token_type_ids") and any(enc["token_type_ids"]):
                 example["token_type_ids"] = enc["token_type_ids"]
+
+            if with_contrastive:
+                # Separate encodings for InfoNCE — encoded in isolation so the
+                # model cannot trivially align them via cross-lingual attention.
+                enc_src = tokenizer(src, max_length=mono_len, truncation=True, padding=False)
+                enc_tgt = tokenizer(tgt, max_length=mono_len, truncation=True, padding=False)
+                example["src_input_ids"]      = enc_src["input_ids"]
+                example["src_attention_mask"] = enc_src["attention_mask"]
+                example["tgt_input_ids"]      = enc_tgt["input_ids"]
+                example["tgt_attention_mask"] = enc_tgt["attention_mask"]
+
             self.examples.append(example)
 
     def __len__(self) -> int:
@@ -83,6 +102,85 @@ class TLMDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         return self.examples[idx]
+
+
+class TLMContrastiveCollator:
+    """Data collator that applies MLM masking to the concatenated pair and
+    pads the individual src/tgt encodings without masking them."""
+
+    def __init__(self, tokenizer, mlm_probability: float = 0.15):
+        self._mlm = DataCollatorForLanguageModeling(
+            tokenizer=tokenizer, mlm=True, mlm_probability=mlm_probability,
+        )
+        self._pad_id = tokenizer.pad_token_id
+
+    def __call__(self, features: list[dict]) -> dict:
+        mlm_features = [
+            {k: v for k, v in f.items()
+             if k not in ("src_input_ids", "src_attention_mask",
+                          "tgt_input_ids", "tgt_attention_mask")}
+            for f in features
+        ]
+        batch = self._mlm(mlm_features)
+
+        def _pad(seqs: list[list[int]], pad_val: int) -> torch.Tensor:
+            return pad_sequence(
+                [torch.tensor(s) for s in seqs],
+                batch_first=True, padding_value=pad_val,
+            )
+
+        batch["src_input_ids"]      = _pad([f["src_input_ids"]      for f in features], self._pad_id)
+        batch["src_attention_mask"] = _pad([f["src_attention_mask"]  for f in features], 0)
+        batch["tgt_input_ids"]      = _pad([f["tgt_input_ids"]       for f in features], self._pad_id)
+        batch["tgt_attention_mask"] = _pad([f["tgt_attention_mask"]  for f in features], 0)
+        return batch
+
+
+def _mean_pool(hidden: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+    mask = mask.unsqueeze(-1).float()
+    return (hidden * mask).sum(1) / mask.sum(1).clamp(min=1e-9)
+
+
+class TLMContrastiveTrainer(Trainer):
+    """Trainer that adds an InfoNCE sentence-alignment loss to the MLM objective.
+
+    total_loss = mlm_loss + alpha * infonce_loss
+    """
+
+    def __init__(self, *args, contrastive_alpha: float = 0.1,
+                 contrastive_temperature: float = 0.05, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.contrastive_alpha       = contrastive_alpha
+        self.contrastive_temperature = contrastive_temperature
+
+    def compute_loss(self, model, inputs, return_outputs=False, **kwargs):
+        src_ids  = inputs.pop("src_input_ids",      None)
+        tgt_ids  = inputs.pop("tgt_input_ids",      None)
+        src_mask = inputs.pop("src_attention_mask", None)
+        tgt_mask = inputs.pop("tgt_attention_mask", None)
+
+        outputs  = model(**inputs)
+        mlm_loss = outputs.loss
+
+        if self.contrastive_alpha > 0 and src_ids is not None:
+            encoder = model.base_model  # strips the MLM head
+
+            src_hidden = encoder(input_ids=src_ids, attention_mask=src_mask).last_hidden_state
+            tgt_hidden = encoder(input_ids=tgt_ids, attention_mask=tgt_mask).last_hidden_state
+
+            src_emb = F.normalize(_mean_pool(src_hidden, src_mask), dim=-1)
+            tgt_emb = F.normalize(_mean_pool(tgt_hidden, tgt_mask), dim=-1)
+
+            sim    = src_emb @ tgt_emb.T / self.contrastive_temperature
+            labels = torch.arange(len(src_emb), device=sim.device)
+            # Symmetric InfoNCE: average both directions
+            info_nce = (F.cross_entropy(sim, labels) + F.cross_entropy(sim.T, labels)) / 2
+
+            loss = mlm_loss + self.contrastive_alpha * info_nce
+        else:
+            loss = mlm_loss
+
+        return (loss, outputs) if return_outputs else loss
 
 
 class TLMFinetuner:
@@ -163,13 +261,19 @@ class TLMFinetuner:
         if not getattr(model.config, "model_type", None):
             model.config.model_type = cfg.model_name.split("/")[-1].split("-")[0]
 
-        train_ds = TLMDataset(train_pairs, tokenizer, cfg.max_length)
-        dev_ds   = TLMDataset(dev_pairs,   tokenizer, cfg.max_length)
+        use_contrastive = cfg.contrastive_alpha > 0
+        if use_contrastive:
+            print(f"[TLM] contrastive α={cfg.contrastive_alpha}  τ={cfg.contrastive_temperature}")
 
-        collator = DataCollatorForLanguageModeling(
-            tokenizer=tokenizer,
-            mlm=True,
-            mlm_probability=cfg.mlm_probability,
+        train_ds = TLMDataset(train_pairs, tokenizer, cfg.max_length, with_contrastive=use_contrastive)
+        dev_ds   = TLMDataset(dev_pairs,   tokenizer, cfg.max_length, with_contrastive=use_contrastive)
+
+        collator = (
+            TLMContrastiveCollator(tokenizer, mlm_probability=cfg.mlm_probability)
+            if use_contrastive
+            else DataCollatorForLanguageModeling(
+                tokenizer=tokenizer, mlm=True, mlm_probability=cfg.mlm_probability,
+            )
         )
 
         if cfg.wandb_project:
@@ -202,12 +306,19 @@ class TLMFinetuner:
             **hub_kwargs,
         )
 
-        trainer = Trainer(
+        trainer_cls = TLMContrastiveTrainer if use_contrastive else Trainer
+        trainer_kwargs = (
+            {"contrastive_alpha": cfg.contrastive_alpha,
+             "contrastive_temperature": cfg.contrastive_temperature}
+            if use_contrastive else {}
+        )
+        trainer = trainer_cls(
             model=model,
             args=args,
             train_dataset=train_ds,
             eval_dataset=dev_ds,
             data_collator=collator,
+            **trainer_kwargs,
         )
 
         trainer.train()

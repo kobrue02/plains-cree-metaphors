@@ -123,6 +123,20 @@ run_or_print "mono_mlm (Cree MLM warmup → TLM → CLKD → calibrate)" \
       --calibrate-lr 5e-6 \
       --calibrate-epochs 15
 
+# ── Condition F: TLM + InfoNCE → CLKD → calibrate ────────────────────────────
+# TLM is retrained with a joint MLM + InfoNCE contrastive loss (alpha=0.1),
+# which explicitly pulls Cree/English sentence representations together.
+run_or_print "tlm_contrastive (TLM with InfoNCE alignment → CLKD → calibrate)" \
+  sbatch \
+    --job-name=abl_tlm_contrastive \
+    --time=08:00:00 \
+    jobs/pipeline.sh \
+      --base-model "$BASE_MODEL" \
+      --model-id "${MODEL_ID}-abl-tlm-contrastive" \
+      --contrastive-alpha 0.1 \
+      --calibrate-lr 5e-6 \
+      --calibrate-epochs 15
+
 echo ""
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "Dry run complete — no jobs submitted."

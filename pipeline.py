@@ -89,6 +89,10 @@ def main() -> None:
     p.add_argument("--tlm-lr",      type=float, default=2e-5)
     p.add_argument("--grad-accum",  type=int,   default=2)
     p.add_argument("--sentences-file", default=SENTENCES_FILE)
+    p.add_argument("--contrastive-alpha",       type=float, default=0.0,
+                   help="Weight on InfoNCE alignment loss during TLM (0 = pure TLM)")
+    p.add_argument("--contrastive-temperature", type=float, default=0.05,
+                   help="Softmax temperature for InfoNCE (default: 0.05)")
 
     # CLKD
     p.add_argument("--clkd-epochs",      type=int,   default=10)
@@ -157,6 +161,8 @@ def main() -> None:
             max_length=args.max_length,
             hub_model_id=tlm_hub if args.push_intermediates else None,
             wandb_project=args.wandb_project,
+            contrastive_alpha=args.contrastive_alpha,
+            contrastive_temperature=args.contrastive_temperature,
         )
         tlm_ckpt = tlm_local
     else:
