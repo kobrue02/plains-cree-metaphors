@@ -66,9 +66,7 @@ def main() -> None:
     p.add_argument("--skip-clkd",      action="store_true", help="Skip CLKD stage")
     p.add_argument("--skip-calibrate", action="store_true", help="Skip calibration stage")
 
-    # ablation overrides — inject a specific checkpoint as the starting point for
-    # CLKD or calibration, bypassing whatever the preceding stage produced.
-    # Use these to run ablations without modifying the main checkpoint dirs.
+    # ablation overrides — inject a checkpoint for clkd/calibration without touching main checkpoint dirs
     p.add_argument("--clkd-from",      default=None, metavar="CKPT",
                    help="Override the input checkpoint for CLKD (e.g. the base model)")
     p.add_argument("--calibrate-from", default=None, metavar="CKPT",
@@ -102,7 +100,7 @@ def main() -> None:
     p.add_argument("--teacher",          default=TEACHER)
     p.add_argument("--corpus-file",      default="data/bloomfield_texts_sentences.parquet")
 
-    # Calibration
+    # calibration
     p.add_argument("--calibrate-epochs", type=int,   default=10)
     p.add_argument("--calibrate-lr",     type=float, default=5e-6)
     p.add_argument("--literal-ratio",    type=int,   default=3,
@@ -127,8 +125,7 @@ def main() -> None:
     cal_hub  = hub_id(prefix, mid, "calibrated")
 
     # ── Stage 0: Monolingual Cree MLM (ablation only) ─────────────────────────
-    # Warm up the model on Cree-only MLM before cross-lingual TLM.
-    # TLM (Stage 1) starts from this checkpoint instead of the base model.
+    # if run, stage 1 starts from this checkpoint instead of the base model
     tlm_base = args.base_model
     if args.mono_mlm:
         print(f"\n{'='*60}\n  Stage 0 · Mono MLM  ({args.base_model})\n{'='*60}")
@@ -166,7 +163,6 @@ def main() -> None:
         )
         tlm_ckpt = tlm_local
     else:
-        # Use Hub ID as fallback if local dir doesn't exist
         tlm_ckpt = tlm_local if os.path.isdir(tlm_local) else tlm_hub
         print(f"\nSkipping TLM — using checkpoint: {tlm_ckpt}")
 

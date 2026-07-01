@@ -65,7 +65,6 @@ def build_edtekla_df() -> pd.DataFrame:
     finally:
         if os.path.exists(tmp.name):
             os.remove(tmp.name)
-    # pairs is a list of (cree, english) tuples returned by scrape()
     df = pd.DataFrame(pairs, columns=["text_cree", "text_en"])
     df["source"] = "edtekla"
     return df
@@ -162,7 +161,6 @@ def main() -> None:
     print(f"  Combined                   {len(combined):>6,}")
     print(f"  → {SENTENCES_OUT}")
 
-    # Add Bloomfield 1930 sentences to the annotation pool
     if pairs_1930:
         print(f"\n{'─'*50}")
         print("  Updating annotation pool with Bloomfield 1930 sentences ...")

@@ -20,7 +20,7 @@ Usage:
 from __future__ import annotations
 import argparse, re, sys, os
 
-# Common English function words — used to detect English paragraphs
+# common english function words used to classify paragraphs as english
 _EN_WORDS = frozenset({
     "the", "he", "she", "was", "had", "his", "her", "and", "then", "to", "of",
     "that", "this", "it", "in", "for", "on", "at", "by", "with", "as", "said",
@@ -33,20 +33,16 @@ _EN_WORDS = frozenset({
     "away", "man", "woman", "old", "new", "good", "great", "too", "if", "how",
 })
 
-# Story header: "(N)  Title-in-Title-Case"
-# Allow leading OCR noise characters (_, ., >, ', -, spaces) before the (N)
+# story header: "(N)  Title-in-Title-Case" — allow leading OCR noise characters before the (N)
 _STORY_HEADER = re.compile(r"^[\s._>\'\-]*\((\d{1,2})\)\s+([A-Z][^()]+?)\s*$")
 
-# Standalone page number (line is only digits and whitespace)
 _PAGE_NUMBER = re.compile(r"^\s*\d{1,4}\s*$")
 
-# Footnote/translator lines
 _FOOTNOTE_LINE = re.compile(
     r"^\s*\*\s*|^\s*\d+\s+|^\s*[Ww]ord\s|^\s*[Oo]r\s+read|^\s*[Pp]robably\s"
     r"|^\s*[Tt]ranslation\s|^\s*[Cc][Ff]\.|^\s*[Ii]\.e\.",
 )
 
-# Running page headers from the DJVU scan
 _RUNNING_HEADER = re.compile(
     r"(?i)(sacred\s+stories|sweet\s+grass\s+cree|national\s+museum"
     r"|department\s+of\s+mines|anthropological\s+ser)",
@@ -72,7 +68,7 @@ def _clean_para(text: str) -> str:
             continue
         lines.append(ln)
     text = " ".join(lines)
-    # Remove footnote superscript markers embedded mid-word (e.g. ^2, ^a)
+    # remove footnote superscript markers embedded mid-word (e.g. ^2, ^a)
     text = re.sub(r"\^[\w]?", "", text)
     return re.sub(r"\s+", " ", text).strip()
 
@@ -104,18 +100,12 @@ def _split_paragraphs(text: str) -> list[str]:
 
 
 def _merge_fragments(paras: list[str]) -> list[str]:
-    """Re-join line-level fragments into proper paragraphs.
-
-    In some DJVU stories every physical printed line is followed by a blank
-    line, so each line becomes its own 'paragraph'. We merge consecutive
-    fragments until we hit sentence-final punctuation.
-    """
+    """Re-join line-level fragments caused by DJVU blank lines after every physical line."""
     merged: list[str] = []
     buf = ""
     for p in paras:
         if buf:
-            # A fragment starting with '. ' means the previous line ended a
-            # sentence (the period was split off onto the next line by OCR)
+            # leading '. ' means OCR split the period onto the next line
             if re.match(r"^\.\s+[A-Z]", p):
                 merged.append(buf.strip())
                 buf = p.lstrip(". ")
@@ -123,9 +113,8 @@ def _merge_fragments(paras: list[str]) -> list[str]:
                 buf = buf.rstrip() + " " + p.lstrip()
         else:
             buf = p
-        # Flush when the buffer ends at a sentence boundary
-        tail = buf.rstrip().rstrip("\"”’'")
-        if tail and tail[-1] in ".!?" and len(buf.split()) >= 8:
+        tail = buf.rstrip().rstrip(“\””’’”)
+        if tail and tail[-1] in “.!?” and len(buf.split()) >= 8:
             merged.append(buf.strip())
             buf = ""
     if buf.strip():
@@ -134,15 +123,11 @@ def _merge_fragments(paras: list[str]) -> list[str]:
 
 
 def _find_en_split(paragraphs: list[str]) -> int:
-    """Return the index of the first paragraph that begins the English block.
-
-    Require two consecutive English paragraphs to avoid triggering on isolated
-    English footnotes or editor comments embedded in the Cree section.
-    """
+    """Return the index where the English block begins, requiring two consecutive English paragraphs to avoid false triggers on Cree-embedded footnotes."""
     for i in range(len(paragraphs) - 1):
         if _is_english_para(paragraphs[i]) and _is_english_para(paragraphs[i + 1]):
             return i
-    # Fallback: single English paragraph near the end
+    # fallback: single english paragraph near the end
     for i in range(len(paragraphs) - 1, -1, -1):
         if _is_english_para(paragraphs[i]):
             return i
@@ -152,15 +137,14 @@ def _find_en_split(paragraphs: list[str]) -> int:
 def _extract_stories(full_text: str) -> list[dict]:
     lines = full_text.splitlines()
 
-    # Skip past the table of contents / introduction to the actual texts
+    # skip past table of contents / introduction to the actual texts
     texts_start = 0
     for i, ln in enumerate(lines):
         if re.match(r"\s*TEXTS AND TRANSLATIONS\s*$", ln):
             texts_start = i
             break
 
-    # Find story headers — require monotonically increasing numbers to avoid
-    # false positives from the garbled ToC entries at the top of the DJVU
+    # require monotonically increasing story numbers to avoid false positives from garbled ToC entries
     story_spans: list[tuple[int, int, str]] = []
     last_num = 0
     for i, ln in enumerate(lines[texts_start:], start=texts_start):
@@ -187,8 +171,6 @@ def _extract_stories(full_text: str) -> list[dict]:
             if not _is_english_para(p)
         ]
         en_paras_raw = [_clean_para(p) for p in paragraphs[split_idx:]]
-        # Merge line-level fragments into proper paragraphs (some DJVU stories
-        # have a blank line after every physical printed line)
         en_paras = _merge_fragments([p for p in en_paras_raw if _is_real_para(p)])
 
         stories.append({
@@ -202,12 +184,7 @@ def _extract_stories(full_text: str) -> list[dict]:
 
 
 def _align_pairs(stories: list[dict], max_para_diff: int = 6) -> list[tuple[str, str]]:
-    """Align Cree and English paragraphs 1:1 by position within each story.
-
-    Stories where abs(len(cree) - len(en)) > max_para_diff are skipped; the
-    Cree splits each dialogue line into its own paragraph while the English
-    sometimes merges them, so a loose tolerance catches genuine mis-parses.
-    """
+    """Align Cree and English paragraphs 1:1 by position, skipping stories whose paragraph counts diverge too much."""
     pairs = []
     for story in stories:
         cree = story["cree_paras"]
@@ -236,19 +213,7 @@ def _dedup(pairs: list[tuple[str, str]]) -> list[tuple[str, str]]:
 
 
 def extract(txt_path: str, max_para_diff: int = 10) -> list[tuple[str, str]]:
-    """Extract (cree, english) paragraph-aligned pairs from the Bloomfield 1930 DJVU text.
-
-    Parameters
-    ----------
-    txt_path:
-        Path to the DJVU plain-text export (P005409_djvu.txt).
-    max_para_diff:
-        Only include stories where abs(len(cree_paras) - len(en_paras)) <= this value.
-
-    Returns
-    -------
-    list of (cree, english) tuples after deduplication.
-    """
+    """Extract deduplicated (cree, english) paragraph-aligned pairs from the Bloomfield 1930 DJVU text."""
     with open(txt_path, encoding="utf-8", errors="replace") as f:
         text = f.read()
     stories = _extract_stories(text)

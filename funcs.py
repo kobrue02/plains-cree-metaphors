@@ -28,13 +28,13 @@ FIGURATIVE_PRESETS = {
 
 
 def scrape() -> pd.DataFrame:
-    """ Scrape Bloomfield Plains Cree texts and save to data/bloomfield_texts.csv."""
+    """Scrape Bloomfield Plains Cree texts and save to data/bloomfield_texts.csv."""
     df = BloomfieldScraper().scrape(output="data/bloomfield_texts.parquet")
     return df
 
 
 def scrape_edtekla(output: str, append: bool = False) -> None:
-    """ Download EdTeKLA parallel corpus and write src ||| tgt pairs to output file."""
+    """Download EdTeKLA parallel corpus and write src ||| tgt pairs to output file."""
     EdTeKLAScraper().scrape(output=output, append=append)
 
 
@@ -94,7 +94,7 @@ def fine_tune(
     contrastive_alpha:      float = 0.0,
     contrastive_temperature: float = 0.05,
 ) -> str:
-    """ Fine-tune a masked LM on sentence pairs (TLM) or monolingual text (pass tgt_col=src_col)."""
+    """Fine-tune a masked LM on sentence pairs (TLM) or monolingual text (pass tgt_col=src_col)."""
     if sentences_file:
         sent_df = pd.read_parquet(sentences_file)
         print(f"Loaded {len(sent_df):,} pairs from {sentences_file}")
@@ -119,7 +119,7 @@ def figurative_train(
     encoder:        str | None  = None,
     freeze_encoder: bool        = False,
 ) -> str:
-    """ Train a figurative classifier on VUA20 + MAGPIE + FLUTE and return the checkpoint path."""
+    """Train a figurative classifier on VUA20 + MAGPIE + FLUTE and return the checkpoint path."""
     preset_fn = FIGURATIVE_PRESETS.get(experiment)
     if preset_fn is None:
         raise ValueError(f"Unknown experiment '{experiment}'. Choose from: {list(FIGURATIVE_PRESETS)}")
@@ -149,7 +149,7 @@ def figurative_distill(
     wandb_project:       str | None = None,
     output_dir:          str        = "data/figurative/distilled",
 ) -> str:
-    """ Cross-lingual knowledge distillation on the parallel corpus and return the checkpoint path."""
+    """Cross-lingual knowledge distillation on the parallel corpus and return the checkpoint path."""
     cfg = DistillConfig(
         checkpoint=checkpoint,
         teacher_checkpoint=teacher_checkpoint,
@@ -202,7 +202,7 @@ def figurative_eval_idioms(
     checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
     idioms_file: str = "data/idioms.txt",
 ) -> None:
-    """ Evaluate a figurative model on the Cree idiom golden test set and save results to CSV."""
+    """Evaluate a figurative model on the Cree idiom golden test set and save results to CSV."""
     slug = checkpoint.replace("/", "_").replace("\\", "_")
     output_file = f"data/figurative/idiom_eval_{slug}.csv"
     os.makedirs("data/figurative", exist_ok=True)
@@ -218,7 +218,7 @@ def predict_figurative(
     output_file: str = "data/bloomfield_figurative.csv",
     idioms_file: str = "data/idioms.txt",
 ) -> pd.DataFrame:
-    """ Run figurative detection on Bloomfield Cree sentences and save results to CSV."""
+    """Run figurative detection on Bloomfield Cree sentences and save results to CSV."""
     sentences_df = pd.read_parquet(input_file)
     print(f"Loaded {len(sentences_df):,} sentences from {input_file}")
 
@@ -255,7 +255,7 @@ def predict_figurative(
 
 
 def split_sentences(output: str, confidence: float = 0.0) -> None:
-    """ Split Bloomfield paragraphs into sentence pairs and write src ||| tgt to output file."""
+    """Split Bloomfield paragraphs into sentence pairs and write src ||| tgt to output file."""
     df = pd.read_parquet("data/bloomfield_texts.parquet")
     splitter = ParallelSentenceSplitter(df)
     splitter.write(output, min_confidence=confidence)

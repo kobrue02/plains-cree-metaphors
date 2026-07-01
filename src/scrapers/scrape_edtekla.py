@@ -20,8 +20,7 @@ import requests
 
 _RAW = "https://raw.githubusercontent.com/EdTeKLA/IndigenousLanguages_Corpora/master"
 
-# All (cree_path, english_path, label) pairs confirmed present in the repo.
-# BoW-only files (e.g. SolomonRatt, Bible) are intentionally excluded.
+# confirmed pairs only; BoW-only files (e.g. SolomonRatt, Bible) excluded.
 _PAIRS: list[tuple[str, str, str]] = [
     # Speaker stories
     ("PlainsCree/SpeakerStories/Neil/Neil_cr.txt",
@@ -113,7 +112,6 @@ def _fetch(path: str, session: requests.Session) -> list[str]:
 
 def _clean(line: str) -> str:
     line = re.sub(r"\s+", " ", line).strip()
-    # Strip lone punctuation-only lines
     return line if re.search(r"\w", line) else ""
 
 
@@ -174,21 +172,7 @@ class EdTeKLAScraper:
         min_chars: int = 5,
         append: bool = False,
     ) -> list[tuple[str, str]]:
-        """Fetch all parallel pairs and write to *output*.
-
-        Parameters
-        ----------
-        output:
-            Destination file path (``src ||| tgt`` format, one pair per line).
-        min_chars:
-            Drop pairs where either side is shorter than this many characters.
-        append:
-            If True, open *output* in append mode instead of overwriting.
-
-        Returns
-        -------
-        list of (cree, english) string pairs collected across all sources.
-        """
+        """Fetch all parallel pairs and write to *output* in ``src ||| tgt`` format."""
         session = requests.Session()
         session.headers["User-Agent"] = "Mozilla/5.0 (academic scraper)"
 

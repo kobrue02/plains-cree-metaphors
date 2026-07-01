@@ -18,15 +18,7 @@ class DictionaryEntry:
 
 
 class ItwewinaClient:
-    """HTTP client for the itwêwina Plains Cree online dictionary.
-
-    Parameters
-    ----------
-    min_interval : float
-        Minimum seconds between requests (rate-limiting).
-    timeout : int
-        Per-request timeout in seconds.
-    """
+    """HTTP client for the itwêwina Plains Cree online dictionary."""
 
     _BASE   = "https://itwewina.altlab.app"
     _SEARCH = f"{_BASE}/search"

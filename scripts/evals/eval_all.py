@@ -38,18 +38,18 @@ from src.figurative.data import LABEL_NAMES
 # ── Shared model lists ────────────────────────────────────────────────────────
 
 _CHECKPOINTS = [
-    # ── Baselines ────────────────────────────────────────────────────────────
+    # ── baselines ────────────────────────────────────────────────────────────
     ("XLM-R base (figurative)",           "KonradBRG/xlm-r-plains-cree-en-tlm-figurative"),
     ("XLM-R large (figurative)",          "KonradBRG/xlm-r-large-plains-cree-en-tlm-figurative"),
     ("XLM-MLM (figurative)",              "KonradBRG/xlm-mlm-100-1280-plains-cree-en-figurative"),
     ("DeBERTa-v3 (English teacher)",      "KonradBRG/deberta-v3-base-figurative"),
-    # ── CLKD : XLM-MLM student ──────────────────────────────────────────────
+    # ── clkd : xlm-mlm student ──────────────────────────────────────────────
     ("XLM-MLM CLKD frozen-12",            "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12"),
     ("XLM-MLM CLKD full",                 "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full"),
-    # ── CLKD : Glot500 student ───────────────────────────────────────────────
+    # ── clkd : glot500 student ───────────────────────────────────────────────
     ("Glot500 CLKD direct",               "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
     ("Glot500 CLKD + TLM",                "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
-    # ── CLKD : XLM-V student ─────────────────────────────────────────────────
+    # ── clkd : xlm-v student ─────────────────────────────────────────────────
     ("XLM-V CLKD direct",                 "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
     ("XLM-V CLKD + TLM",                  "KonradBRG/xlm-v-base-plains-cree-en-clkd-tlm"),
 ]
@@ -98,7 +98,7 @@ TEACHER_ID  = "KonradBRG/deberta-v3-base-figurative"
 # ── Task: checkpoints ─────────────────────────────────────────────────────────
 
 def task_checkpoints() -> None:
-    """(checkpoints) Evaluate all hub checkpoints on the idiom golden set."""
+    """Evaluate all hub checkpoints on the idiom golden set."""
     output_file = "data/figurative/results_table.csv"
 
     def _row(name: str, ckpt: str, result: dict) -> dict:
@@ -152,7 +152,7 @@ def task_checkpoints() -> None:
 # ── Task: figurative-rate ─────────────────────────────────────────────────────
 
 def task_figurative_rate() -> None:
-    """(2) Figurative Rate on Bloomfield Corpus."""
+    """Figurative rate on the Bloomfield corpus."""
     output_file = "data/figurative/eval_figurative_rate.csv"
 
     df = pd.read_parquet(CORPUS_FILE).dropna(subset=["text_cree"])
@@ -197,7 +197,7 @@ def task_figurative_rate() -> None:
 # ── Task: simile ──────────────────────────────────────────────────────────────
 
 def task_simile() -> None:
-    """(3) Simile Detection via Surface Markers (tâpiskôc)."""
+    """Simile detection via surface marker tâpiskôc."""
     import re
     from collections import Counter
 
@@ -218,7 +218,6 @@ def task_simile() -> None:
     simile_texts = simile_df["text_cree"].tolist()
     other_texts  = other_df["text_cree"].tolist()
 
-    # Teacher sanity check: what does DeBERTa predict on the English translations?
     en_simile_texts = simile_df["text_en"].dropna().tolist()
     print(f"\n{'='*60}")
     print(f"  Teacher sanity check ({len(en_simile_texts)} English tâpiskôc translations)")
@@ -254,11 +253,8 @@ def task_simile() -> None:
             simile_labels = [p["label"] for p in simile_preds]
             other_labels  = [p["label"] for p in other_preds]
 
-            # True positive rate: tâpiskôc sentences predicted as simile
             tp_rate = sum(l == "simile" for l in simile_labels) / len(simile_labels)
-            # False positive rate: non-simile sentences predicted as simile
             fp_rate = sum(l == "simile" for l in other_labels)  / len(other_labels)
-            # Figurative rate on simile sentences (any non-literal)
             fig_rate_simile = sum(l != "literal" for l in simile_labels) / len(simile_labels)
 
             print(f"  simile_tp_rate={tp_rate:.1%}  "
@@ -303,7 +299,7 @@ def task_simile() -> None:
 # ── Task: consistency ─────────────────────────────────────────────────────────
 
 def task_consistency() -> None:
-    """(1) English-Cree Consistency Evaluation."""
+    """English-Cree label consistency evaluation."""
     import numpy as np
 
     output_file = "data/figurative/eval_consistency.csv"
@@ -339,10 +335,8 @@ def task_consistency() -> None:
 
             student_labels = student_probs.argmax(axis=1)
 
-            # Label agreement
             agreement = (student_labels == teacher_labels).mean()
 
-            # Per-class agreement
             per_class = {}
             for i, label in enumerate(LABEL_NAMES):
                 mask = teacher_labels == i
@@ -351,7 +345,6 @@ def task_consistency() -> None:
                 else:
                     per_class[f"agree_{label}"] = float("nan")
 
-            # Mean KL divergence: KL(teacher || student)
             t_log = np.log(teacher_probs + 1e-8)
             s_log = np.log(student_probs + 1e-8)
             kl = (teacher_probs * (t_log - s_log)).sum(axis=1).mean()

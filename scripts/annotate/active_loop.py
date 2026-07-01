@@ -75,7 +75,6 @@ def phase_infer(checkpoint: str) -> pd.DataFrame:
     os.makedirs(os.path.dirname(ACTIVE_POOL), exist_ok=True)
     unlabeled.to_parquet(ACTIVE_POOL, index=False)
 
-    # Summary counts
     high_fig = (unlabeled["confidence"] >= HIGH_CONF) & (unlabeled["label"] != "literal")
     low      =  unlabeled["confidence"] < LOW_CONF
     high_lit = (unlabeled["confidence"] >= HIGH_CONF) & (unlabeled["label"] == "literal")
@@ -154,11 +153,9 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     import wandb
     from src.scrapers.scrape_itwewina import lookup_sentence, format_for_prompt
 
-    # Queue: only low-confidence sentences — high-conf figurative go straight to
-    # pseudo-labels in phase_retrain and should not be second-guessed by DeepSeek
+    # only low-confidence sentences — high-conf figurative become pseudo-labels in phase_retrain
     queue = pool[pool["confidence"] < LOW_CONF].copy()
 
-    # Skip already-annotated (active_deepseek rows in the unified annotations file)
     done_texts: set[str] = set()
     if os.path.exists(ANNOT_FILE):
         done_all = pd.read_parquet(ANNOT_FILE)
@@ -166,7 +163,6 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
         done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
         queue = queue[~queue["text_cree"].isin(done_texts)]
 
-    # Figurative predictions first, then ascending confidence
     queue["_fig"] = queue["label"] != "literal"
     queue = queue.sort_values(["_fig", "confidence"], ascending=[False, True]).drop(columns=["_fig"])
     if max_annotate > 0:
@@ -215,7 +211,6 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
 
     new_df = pd.DataFrame(rows)
 
-    # Merge new active annotations into the unified annotations file
     if os.path.exists(ANNOT_FILE):
         existing = pd.read_parquet(ANNOT_FILE)
         new_df = pd.concat([existing, new_df], ignore_index=True)
@@ -260,7 +255,6 @@ def phase_retrain(
         (pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal")
     ][["text_cree", "text_en", "label"]].copy()
 
-    # Remove pseudo-label candidates already annotated
     annotated_texts = set(all_annot["text_cree"].dropna().str.strip().tolist())
     pseudo = pseudo[~pseudo["text_cree"].isin(annotated_texts)]
 
@@ -313,16 +307,13 @@ def cmd_infer(args) -> None:
     import torch
     from src.figurative.predict import load_model, predict_sentences
 
-    # Load already-annotated sentence texts to exclude
     annotated = pd.read_parquet(ANNOT_FILE)
     known_texts = set(annotated["text_cree"].dropna().str.strip().tolist())
 
-    # Load full pool
     pool = pd.read_parquet(POOL_FILE)
     pool = pool.dropna(subset=["text_cree", "text_en"])
     pool["text_cree"] = pool["text_cree"].str.strip()
 
-    # Remove already-annotated
     unlabeled = pool[~pool["text_cree"].isin(known_texts)].copy()
     print(f"Unlabeled pool: {len(unlabeled):,} sentences "
           f"({len(pool)-len(unlabeled):,} already annotated)")
@@ -345,7 +336,6 @@ def cmd_infer(args) -> None:
     os.makedirs(os.path.dirname(ACTIVE_POOL), exist_ok=True)
     df.to_parquet(ACTIVE_POOL, index=False)
 
-    # Summary
     high_fig = df[(df["confidence"] >= HIGH_CONF) & (df["label"] != "literal")]
     low      = df[df["confidence"] < LOW_CONF]
     high_lit = df[(df["confidence"] >= HIGH_CONF) & (df["label"] == "literal")]
@@ -416,21 +406,18 @@ def cmd_annotate(args) -> None:
 
     pool = pd.read_parquet(ACTIVE_POOL)
 
-    # Load existing active annotations to skip already-done ones
     done_texts: set[str] = set()
     if os.path.exists(ANNOT_FILE):
         done_all = pd.read_parquet(ANNOT_FILE)
         active_done = done_all[done_all["source"].str.startswith("active_", na=False)]
         done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
 
-    # Build annotation queue: low confidence OR high-conf figurative
     queue = pool[
         (pool["confidence"] < LOW_CONF) |
         ((pool["confidence"] >= HIGH_CONF) & (pool["label"] != "literal"))
     ].copy()
     queue = queue[~queue["text_cree"].isin(done_texts)]
 
-    # Sort: figurative predictions first, then by ascending confidence
     queue["_fig"] = queue["label"] != "literal"
     queue = queue.sort_values(["_fig", "confidence"], ascending=[False, True])
     queue = queue.drop(columns=["_fig"])
@@ -444,7 +431,6 @@ def cmd_annotate(args) -> None:
     batch_df = queue.head(batch)
 
     for _, row in batch_df.iterrows():
-        # Dictionary lookup
         lookups = lookup_sentence(row["text_cree"], verbose=False)
         prompt  = format_for_prompt(row["text_cree"], row["text_en"], lookups)
         probs   = {l: row[f"prob_{l}"] for l in LABELS}
@@ -471,7 +457,6 @@ def cmd_annotate(args) -> None:
         print("Nothing annotated.")
         return
 
-    # Merge new annotations into the unified annotations file
     new_df = pd.DataFrame(annotated_rows)
     if os.path.exists(ANNOT_FILE):
         existing = pd.read_parquet(ANNOT_FILE)
@@ -487,7 +472,6 @@ def cmd_retrain(args) -> None:
     """Retrain calibration with expanded data (no wandb)."""
     from funcs import calibrate
 
-    # Load unified annotations (contains both gold and active rows)
     if not os.path.exists(ANNOT_FILE):
         sys.exit(f"No annotations found at {ANNOT_FILE}. Run 'annotate' first.")
     all_annot = pd.read_parquet(ANNOT_FILE)
@@ -495,7 +479,6 @@ def cmd_retrain(args) -> None:
     gold   = all_annot[~is_active]
     active = all_annot[is_active]
 
-    # Optionally also add high-confidence pseudo-labels
     if os.path.exists(ACTIVE_POOL):
         pool = pd.read_parquet(ACTIVE_POOL)
         pseudo = pool[
@@ -506,7 +489,6 @@ def cmd_retrain(args) -> None:
     else:
         pseudo = pd.DataFrame(columns=["text_cree", "text_en", "label"])
 
-    # Merge: all annotations + pseudo
     annotated_texts = set(all_annot["text_cree"].dropna().str.strip().tolist())
     pseudo = pseudo[~pseudo["text_cree"].isin(annotated_texts)]
     combined = pd.concat([
@@ -518,7 +500,6 @@ def cmd_retrain(args) -> None:
           f"(gold={len(gold):,}, active={len(active):,}, pseudo={len(pseudo):,})")
     print(f"Label dist: {combined['label'].value_counts().to_dict()}")
 
-    # Write merged annotation file to temp location
     tmp = tempfile.NamedTemporaryFile(suffix=".parquet", delete=False)
     tmp.close()
     combined.to_parquet(tmp.name, index=False)
@@ -665,8 +646,7 @@ def main() -> None:
 
     sub.add_parser("status", help="Show annotation progress")
 
-    # ── For backwards compatibility: top-level loop flags (no subcommand) ─────
-    # These are forwarded to run_loop() when no subcommand is given.
+    # ── for backwards compatibility: top-level loop flags forwarded to run_loop() when no subcommand is given ─────
     p.add_argument("--checkpoint",   default=CALIBRATED_MODEL)
     p.add_argument("--skip-infer",   action="store_true")
     p.add_argument("--max-annotate", type=int, default=0)

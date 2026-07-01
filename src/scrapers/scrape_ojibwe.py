@@ -26,8 +26,7 @@ from dataclasses import dataclass, field
 
 # ── Language detection ─────────────────────────────────────────────────────────
 
-# Strong Ojibwe markers: vowel-apostrophe clusters, affricates tc/dc,
-# subscript digit sequences like a11/Ii8i/o8, /u /i encodings.
+# strong ojibwe markers: vowel-apostrophe clusters, affricates tc/dc, subscript digits, /u /i encodings
 _OJI_RE = re.compile(
     r"[aeiou]['''][a-z]"          # vowel-apostrophe (a'pi, o'o')
     r"|[a-z][0-9]{1,2}[a-z]"     # subscript numbers: a11, Ii8i
@@ -43,11 +42,9 @@ _EN_WORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Bare page number or Roman numerals line (to skip)
 _PAGE_NUM_RE = re.compile(r"^[IVXLC]+$|^\d+$")
 
-# Story-section headers: "i. THE BIRTH OF NANABUSHU." or "2. THE THEFT OF FIRE."
-# Both Arabic and lower-case Roman numerals (i, ii, iii...) are used.
+# story-section headers accept both arabic and lower-case roman numerals (i, ii, iii...)
 _HEADER_RE = re.compile(
     r"^[ivxlc\d]+\."          # "i." or "2."
     r"\s+[A-Z][A-Z\s,'\-]{4,}"  # title in caps
@@ -55,10 +52,10 @@ _HEADER_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Series/chapter dividers (not story headers)
+# series/chapter dividers (not story headers)
 _SERIES_RE = re.compile(r"^(SERIES|PART|I\s*[.—-]|II\s*[.—-])", re.IGNORECASE)
 
-# Footnote: short line starting with a digit (e.g.  "1 Saga'a'man, 'when you go out'")
+# footnote: short line starting with a digit (e.g. "1 Saga'a'man, 'when you go out'")
 _FOOTNOTE_RE = re.compile(r"^\d+\s+\S")
 
 
@@ -76,27 +73,21 @@ def classify_block(raw: str) -> str:
     if not text:
         return "meta"
 
-    # Bare page numbers / Roman numerals
     if _PAGE_NUM_RE.match(text):
         return "meta"
 
-    # Series / part dividers
     if _SERIES_RE.match(text):
         return "meta"
 
-    # Publication header / preface boilerplate (all-caps short line)
     if re.match(r"^[A-Z\s.,'\-]{3,60}$", text) and len(text.split()) <= 8:
         return "meta"
 
-    # Story headers
     if _HEADER_RE.match(text):
         return "header"
 
-    # Footnotes: short block starting with a digit
     if _FOOTNOTE_RE.match(text) and len(text) < 300:
         return "footnote"
 
-    # Language score
     oji = _ojibwe_score(text)
     eng = _english_score(text)
     if oji == 0 and eng == 0:
@@ -106,25 +97,20 @@ def classify_block(raw: str) -> str:
 
 # ── Text cleaning ──────────────────────────────────────────────────────────────
 
-_MARGIN_NUM_RE = re.compile(r"(?m)^\s*\d+\s{2,}")  # "5   " at line start
+_MARGIN_NUM_RE = re.compile(r"(?m)^\s*\d+\s{2,}")  # e.g. "5   " at line start
 
 
 def clean_block(raw: str) -> str:
     """Normalize OCR artifacts in a paragraph."""
-    # Strip left-margin line numbers (Ojibwe text only)
     text = _MARGIN_NUM_RE.sub("", raw)
-    # Collapse multiple spaces / fix OCR double-space typesetting
     text = re.sub(r"  +", " ", text)
-    # Rejoin hyphenated line-breaks: "some-\nthing" → "something"
     text = re.sub(r"-\s*\n\s*", "", text)
-    # Strip remaining newlines
     text = re.sub(r"\s*\n\s*", " ", text)
     return text.strip()
 
 
 def strip_header(text: str) -> str:
     """Normalize a story header to a stable key."""
-    # Remove OCR noise, extra spaces, trailing footnote digits
     t = re.sub(r"\s+", " ", text).strip()
     t = re.sub(r"\d+\s*$", "", t).strip().rstrip(".")
     return t.upper()
@@ -142,8 +128,7 @@ class Story:
 def parse(path: str | Path) -> list[Story]:
     raw = Path(path).read_text(encoding="utf-8", errors="replace")
 
-    # Locate where the actual texts begin (after preface/front matter).
-    # The first Ojibwe story paragraph starts after the first story header.
+    # skip preface/front matter; texts begin at the first story header
     match = re.search(
         r"(?m)^i\.?\s+THE\s+BIRTH\s+OF\s+NANABUSHU",
         raw, re.IGNORECASE,
@@ -151,7 +136,6 @@ def parse(path: str | Path) -> list[Story]:
     if match:
         raw = raw[match.start():]
 
-    # Split into blank-line-separated blocks
     blocks = re.split(r"\n{2,}", raw)
 
     stories: dict[str, Story] = {}
@@ -176,7 +160,6 @@ def parse(path: str | Path) -> list[Story]:
         elif label == "english":
             stories[current_title].english.append(text)
 
-    # Remove the preamble stub
     stories.pop("__preamble__", None)
     return list(stories.values())
 

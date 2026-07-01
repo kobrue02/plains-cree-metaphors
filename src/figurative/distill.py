@@ -46,7 +46,7 @@ except ImportError:
 
 @dataclass
 class DistillConfig:
-    # Student: TLM-adapted XLM checkpoint (or figurative checkpoint for align/binary_kl)
+    # tlm-adapted xlm checkpoint (or figurative checkpoint for align/binary_kl)
     checkpoint:  str  = "KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm"
     corpus_file: str  = "data/bloomfield_texts_sentences.parquet"
 
@@ -54,12 +54,9 @@ class DistillConfig:
     mode:        str  = "clkd"
 
     # ── CLKD-specific ─────────────────────────────────────────────────────────
-    # Frozen English teacher — required for mode="clkd"
-    teacher_checkpoint: str | None = None
-    # Freeze the first N transformer layers of the student (0 = train all)
-    freeze_n_layers:    int        = 0
-    # Output classes — must match the teacher's num_labels
-    num_labels:         int        = 4
+    teacher_checkpoint: str | None = None  # required for mode="clkd"
+    freeze_n_layers:    int        = 0     # freeze first n student transformer layers (0 = train all)
+    num_labels:         int        = 4     # must match the teacher's num_labels
 
     # ── Training ──────────────────────────────────────────────────────────────
     batch_size:    int   = 16
@@ -180,12 +177,7 @@ def _clkd_loss(
 # ── Layer freezing ─────────────────────────────────────────────────────────────
 
 def _freeze_n_layers(model, n: int) -> None:
-    """Freeze embeddings and the first *n* transformer layers.
-
-    Matches generically across architectures: XLM uses ``attentions.{i}.``,
-    XLM-R/DeBERTa use ``encoder.layer.{i}.``.  Any parameter whose first
-    integer path segment is < n is frozen, as are all embedding layers.
-    """
+    """Freeze embeddings and the first n transformer layers; works across XLM, XLM-R, and DeBERTa by matching the first integer path segment."""
     for name, param in model.named_parameters():
         if re.search(r'\bembeddings?\b|\blangEmbeddings\b|\bposition_embeddings\b', name):
             param.requires_grad = False
@@ -218,7 +210,6 @@ def _distill_clkd(config: DistillConfig) -> str:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Teacher: frozen English figurative classifier
     print(f"[distill] loading teacher : {config.teacher_checkpoint}")
     _t_use_fast = "deberta-v3" not in config.teacher_checkpoint.lower()
     teacher_tokenizer = AutoTokenizer.from_pretrained(config.teacher_checkpoint, use_fast=_t_use_fast)
@@ -230,7 +221,6 @@ def _distill_clkd(config: DistillConfig) -> str:
         p.requires_grad = False
     print(f"[distill] teacher frozen  — {sum(p.numel() for p in teacher.parameters()):,} params")
 
-    # Student: TLM checkpoint loaded as sequence classifier
     print(f"[distill] loading student : {config.checkpoint}")
     student_tokenizer = AutoTokenizer.from_pretrained(config.checkpoint)
     student = AutoModelForSequenceClassification.from_pretrained(

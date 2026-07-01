@@ -24,16 +24,12 @@ Usage:
 from __future__ import annotations
 import argparse, re, sys, os
 
-# SRO macron vowels used in this textbook
 _CREE_RE  = re.compile(r"[āēīōĀĒĪŌ]")
-# Numbered example line: "  N. <text>   <translation>"
 _NUM_LINE = re.compile(r"^\s{1,6}\d{1,2}\.\s+(.+)")
-# Detect lines that are only English prose (long sentences, chapter headers, etc.)
 _PROSE    = re.compile(
     r"^(Chapter|Note|Figure|The |This |In |For |When |One |Unlike|Although|Because|"
     r"While |Consider|There |Taking|Putting|Examples?:|These |As |So |That |It |If )", re.I
 )
-# Vocabulary-only lines (single Cree word/preverb followed by English gloss)
 _VOCAB    = re.compile(r"^([^\s]{2,25})\s{3,}([^\s].{0,60})$")
 
 
@@ -70,16 +66,13 @@ def _split_inline(line: str) -> tuple[str, str] | None:
     The split heuristic: find the boundary where a run of ≥3 spaces separates
     Cree text (contains macrons) from English text (no macrons).
     """
-    # Must contain a Cree indicator
     if not _has_cree(line):
         return None
 
-    # Find the longest whitespace gap
     gaps = [(m.start(), m.end()) for m in re.finditer(r" {3,}", line)]
     if not gaps:
         return None
 
-    # Try each gap from right to left; keep the first split where left=Cree, right=English
     for start, end in reversed(gaps):
         left  = line[:start].strip()
         right = line[end:].strip()
@@ -96,7 +89,6 @@ def _extract_pairs(text: str) -> list[tuple[str, str]]:
         raw = lines[i]
         stripped = raw.strip()
 
-        # Skip empty lines, prose headers, page numbers
         if not stripped or stripped.isdigit() or _PROSE.match(stripped):
             i += 1
             continue
@@ -110,9 +102,8 @@ def _extract_pairs(text: str) -> list[tuple[str, str]]:
                 pairs.append(pair)
                 i += 1
                 continue
-            # May be a numbered stacked pair — Cree on this line, English next
+            # may be a numbered stacked pair — Cree on this line, English next
             if _is_cree_dominant(content) and not _PROSE.match(content):
-                # Look ahead for the English line
                 j = i + 1
                 while j < len(lines) and not lines[j].strip():
                     j += 1
@@ -132,14 +123,13 @@ def _extract_pairs(text: str) -> list[tuple[str, str]]:
                 pairs.append(pair)
                 i += 1
                 continue
-            # Look ahead
             j = i + 1
             while j < len(lines) and not lines[j].strip():
                 j += 1
             if j < len(lines):
                 nxt = lines[j].strip()
                 if _is_english(nxt) and len(nxt) > 3 and not _has_cree(nxt):
-                    # Sanity: Cree line should look like a sentence or phrase (not a header)
+                    # sanity: cree line should look like a sentence or phrase (not a header)
                     if len(stripped) > 5:
                         pairs.append((_clean(stripped), _clean(nxt)))
                         i = j + 1
@@ -166,48 +156,35 @@ def _keep(cree: str, en: str, min_cree_len: int = 5) -> bool:
         return False
     if not _has_cree(cree):
         return False
-    # Syllable breakdown: Cree side has isolated single syllables with spaces
-    # e.g. "tā ni si" or "pi mā ci ho win"
+    # syllable-breakdown lines are not sentences (e.g. "tā ni si")
     if re.search(r"\b[a-zāēīō]{1,3} [a-zāēīō]{1,3} [a-zāēīō]{1,3}\b", cree):
         return False
-    # Derivation formula lines
+    # derivation formula lines
     if "+" in cree or "=" in cree:
         return False
-    # Parenthetical gloss in Cree side indicates derivation example
+    # parenthetical gloss in cree side indicates derivation example
     if re.search(r"\([a-z]", cree):
         return False
-    # Grammar metalanguage on English side
+    # grammar metalanguage on english side
     if re.search(r"\b(subject|verb|object|noun|stem|suffix|prefix)\b", en, re.I):
         return False
-    # English side starts with a number (numbered list item from derivation chapter)
+    # numbered list item from derivation chapter
     if re.match(r"\d+\.", en):
         return False
-    # Bibliography / metadata
+    # bibliography / metadata
     if re.search(r"(isbn|pm\d{3}|\d{4}-\d{4}|edition\.|new edition)", en, re.I):
         return False
-    # English side looks like a prose sentence fragment (from front matter)
+    # prose fragment from front matter
     if re.match(r"(Includes|As a result|Some changes|This edition)", en):
         return False
-    # Author name line
+    # author name line
     if re.match(r"Jean L\.", cree):
         return False
     return True
 
 
 def extract(pdf_path: str, min_cree_len: int = 5) -> list[tuple[str, str]]:
-    """Extract (cree, english) parallel pairs from the Okimasis PDF.
-
-    Parameters
-    ----------
-    pdf_path:
-        Path to the Okimasis PDF file.
-    min_cree_len:
-        Minimum number of characters required in the Cree side of a pair.
-
-    Returns
-    -------
-    list of (cree, english) tuples after deduplication and filtering.
-    """
+    """Extract deduplicated (cree, english) parallel pairs from the Okimasis PDF."""
     try:
         import fitz  # pymupdf
         doc  = fitz.open(pdf_path)

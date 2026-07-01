@@ -71,11 +71,7 @@ def predict_idioms(
     tokenizer: AutoTokenizer,
     **kwargs,
 ) -> pd.DataFrame:
-    """Run the model on both sides of an idioms file (cree ||| english).
-
-    Returns a DataFrame comparing predictions for the Cree text vs. the
-    English translation — useful for measuring cross-lingual idiom transfer.
-    """
+    """Run the model on both sides of an idioms file (cree ||| english). Returns a DataFrame comparing predictions for the Cree text vs. the English translation."""
     rows = []
     with open(idioms_path, encoding="utf-8") as f:
         for line in f:
@@ -120,13 +116,7 @@ def eval_idioms(
     tokenizer: AutoTokenizer,
     **kwargs,
 ) -> dict:
-    """Evaluate on the Cree idiom golden test set and print a summary.
-
-    All entries in idioms.txt are idioms (class 1), so the ground truth is
-    fixed.  Reports two metrics for both Cree and English:
-      - idiom accuracy   : % predicted as 'idiom'
-      - figurative rate  : % predicted as any non-literal class
-    """
+    """Evaluate on the Cree idiom golden test set; all entries are class 1 (idiom) so ground truth is fixed."""
     df = predict_idioms(idioms_path, model, tokenizer, **kwargs)
 
     print(f"\n{'='*60}")

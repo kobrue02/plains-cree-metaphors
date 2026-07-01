@@ -33,7 +33,7 @@ class TLMConfig:
     """Hyperparameters for TLM fine-tuning."""
     model_name:      str   = "xlm-roberta-base"
     output_dir:      str   = "data/tlm_model"
-    max_length:      int   = 256     # tokens per concatenated pair; XLM-R max = 512
+    max_length:      int   = 256     # tokens per concatenated pair; xlm-r max = 512
     mlm_probability: float = 0.15
     batch_size:      int   = 16
     grad_accum:      int   = 2
@@ -44,11 +44,10 @@ class TLMConfig:
     dev_ratio:       float = 0.05
     seed:            int   = 42
     hub_model_id:    str | None = None
-    wandb_project:   str | None = None  # e.g. "fnlp-tlm"; set to None to disable
-    # InfoNCE contrastive alignment — set alpha > 0 to enable.
-    # Each batch encodes src and tgt separately and adds InfoNCE to the MLM loss.
-    contrastive_alpha:       float = 0.0   # weight on InfoNCE term; 0 = pure TLM
-    contrastive_temperature: float = 0.05  # softmax temperature for InfoNCE
+    wandb_project:   str | None = None  # e.g. "fnlp-tlm"
+    # infonce contrastive alignment — set alpha > 0 to enable
+    contrastive_alpha:       float = 0.0   # weight on infonce term; 0 = pure tlm
+    contrastive_temperature: float = 0.05  # softmax temperature for infonce
 
 
 class TLMDataset(Dataset):
@@ -68,7 +67,7 @@ class TLMDataset(Dataset):
         with_contrastive: bool = False,
     ):
         self.examples: list[dict] = []
-        mono_len = max_length // 2  # individual sentence budget
+        mono_len = max_length // 2
         for src, tgt in pairs:
             enc = tokenizer(
                 src, tgt,
@@ -80,14 +79,12 @@ class TLMDataset(Dataset):
                 "input_ids":      enc["input_ids"],
                 "attention_mask": enc["attention_mask"],
             }
-            # XLM-R produces all-zero token_type_ids (useless); XLM uses them to
-            # distinguish the two language segments, so keep them when present.
+            # xlm-r always emits zero token_type_ids; xlm uses them to distinguish segments
             if enc.get("token_type_ids") and any(enc["token_type_ids"]):
                 example["token_type_ids"] = enc["token_type_ids"]
 
             if with_contrastive:
-                # Separate encodings for InfoNCE — encoded in isolation so the
-                # model cannot trivially align them via cross-lingual attention.
+                # separate encodings so the model can't align via cross-lingual attention
                 enc_src = tokenizer(src, max_length=mono_len, truncation=True, padding=False)
                 enc_tgt = tokenizer(tgt, max_length=mono_len, truncation=True, padding=False)
                 example["src_input_ids"]      = enc_src["input_ids"]
@@ -163,7 +160,7 @@ class TLMContrastiveTrainer(Trainer):
         mlm_loss = outputs.loss
 
         if self.contrastive_alpha > 0 and src_ids is not None:
-            encoder = model.base_model  # strips the MLM head
+            encoder = model.base_model  # strip the mlm head
 
             src_hidden = encoder(input_ids=src_ids, attention_mask=src_mask).last_hidden_state
             tgt_hidden = encoder(input_ids=tgt_ids, attention_mask=tgt_mask).last_hidden_state
@@ -173,7 +170,7 @@ class TLMContrastiveTrainer(Trainer):
 
             sim    = src_emb @ tgt_emb.T / self.contrastive_temperature
             labels = torch.arange(len(src_emb), device=sim.device)
-            # Symmetric InfoNCE: average both directions
+            # symmetric infonce: average both directions
             info_nce = (F.cross_entropy(sim, labels) + F.cross_entropy(sim.T, labels)) / 2
 
             loss = mlm_loss + self.contrastive_alpha * info_nce
@@ -185,11 +182,6 @@ class TLMContrastiveTrainer(Trainer):
 
 class TLMFinetuner:
     """Fine-tune XLM-R (or any masked LM) on Cree-English parallel data via TLM.
-
-    Parameters
-    ----------
-    config : TLMConfig, optional
-        Hyperparameters; defaults to ``TLMConfig()``.
 
     Example
     -------
@@ -211,24 +203,7 @@ class TLMFinetuner:
         tgt_col: str = "text_en",
         dev_df:  pd.DataFrame | None = None,
     ) -> str:
-        """Fine-tune on parallel sentence pairs using TLM loss.
-
-        Parameters
-        ----------
-        df : pd.DataFrame
-            Training data with ``src_col`` and ``tgt_col`` columns.
-            Pass a confidence-filtered slice for cleaner training signal.
-        src_col, tgt_col : str
-            Column names for the two languages.
-        dev_df : pd.DataFrame, optional
-            Explicit dev set. If None, ``config.dev_ratio`` of ``df`` is
-            held out automatically.
-
-        Returns
-        -------
-        str
-            Path to the saved checkpoint.
-        """
+        """Fine-tune on parallel sentence pairs using TLM loss. Returns the checkpoint path."""
         cfg = self.config
         os.makedirs(cfg.output_dir, exist_ok=True)
 
@@ -256,7 +231,7 @@ class TLMFinetuner:
         tokenizer = AutoTokenizer.from_pretrained(cfg.model_name)
         model     = AutoModelForMaskedLM.from_pretrained(
             cfg.model_name,
-            torch_dtype=torch.float32,  # load in FP32; Trainer casts to BF16 if needed
+            torch_dtype=torch.float32,  # load in fp32; trainer casts to bf16 if needed
         )
         if not getattr(model.config, "model_type", None):
             model.config.model_type = cfg.model_name.split("/")[-1].split("-")[0]

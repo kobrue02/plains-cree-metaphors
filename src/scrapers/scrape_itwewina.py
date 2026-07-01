@@ -29,7 +29,7 @@ _BASE = "https://itwewina.altlab.app/search"
 _SESSION = requests.Session()
 _SESSION.headers["User-Agent"] = "Mozilla/5.0 (academic research scraper)"
 
-# Cree preverbs / particles to skip (not worth looking up)
+# cree preverbs / particles to skip (not worth looking up)
 _SKIP = re.compile(
     r"^(kâ|ka|ê|e|wî|wi|nî|ni|ki|kî|pê|pî|isko|isi|mâh|âh|nôh|"
     r"mêk|êkwa|êkosi|mîna|piko|tâpwê|êsa|ana|awa|ôma|ôhi|ôho|"
@@ -52,28 +52,25 @@ def _parse_results(html: str) -> list[dict]:
             continue
         lemma = _clean(lemma_el.get_text())
 
-        # Grammatical class: first token before emoji/whitespace
+        # grammatical class: first token before emoji/whitespace
         elab = result.select_one("div.definition__elaboration")
         pos = ""
         if elab:
             raw = _clean(elab.get_text())
-            # e.g. "NI-2 💧 like: ..."  or  "VAI-1  like: ..."
             pos = raw.split()[0] if raw else ""
 
-        # Part-of-speech label (Naming word, Action word, etc.)
+        # part-of-speech label (Naming word, Action word, etc.)
         wc = result.select_one("span.wordclass")
         pos_label = ""
         if wc:
             # strip emoji
             pos_label = re.sub(r"[^\w\s-]", "", wc.get_text()).strip()
 
-        # Definitions — each <li> inside <ol.meanings>
         definitions = []
         for meaning_li in result.select("ol.meanings li"):
-            # The definition text is the first text node; source citation follows
+            # the definition text is the first text node; source citation follows
             texts = [t.strip() for t in meaning_li.stripped_strings]
             if texts:
-                # First string is the definition, rest is citation
                 definitions.append(texts[0])
 
         if lemma and definitions:
@@ -89,20 +86,7 @@ def _parse_results(html: str) -> list[dict]:
 
 @lru_cache(maxsize=2048)
 def lookup(word: str, delay: float = 0.3) -> list[dict]:
-    """Return dictionary entries for *word*, cached in-process.
-
-    Parameters
-    ----------
-    word:
-        A single Cree word (SRO orthography).
-    delay:
-        Polite delay in seconds between requests.
-
-    Returns
-    -------
-    List of entry dicts with keys: lemma, pos, pos_label, definitions.
-    Empty list if not found.
-    """
+    """Return dictionary entries for *word*, cached in-process; *delay* is a polite inter-request pause."""
     time.sleep(delay)
     try:
         r = _SESSION.get(_BASE, params={"q": word}, timeout=10)
@@ -124,13 +108,7 @@ def lookup_sentence(
     delay: float = 0.3,
     verbose: bool = False,
 ) -> dict[str, list[dict]]:
-    """Look up every content word in *sentence*.
-
-    Returns
-    -------
-    Dict mapping each token to its list of dictionary entries.
-    Tokens with no entries are omitted.
-    """
+    """Look up every content word in *sentence*; returns a dict of token→entries, omitting tokens with no results."""
     tokens = list(dict.fromkeys(_tokenise(sentence)))  # deduplicate, preserve order
     results: dict[str, list[dict]] = {}
     for tok in tokens:

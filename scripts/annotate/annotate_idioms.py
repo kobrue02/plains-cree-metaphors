@@ -76,7 +76,7 @@ def main() -> None:
     print("Scanning for idiom matches:")
     matched = scan(pool_new, idioms)
 
-    # Deduplicate (sentence can match multiple idioms — keep first match)
+    # deduplicate — a sentence can match multiple idioms; keep first match
     seen:   set[str]  = set()
     unique: list[dict] = []
     for row in matched:
@@ -93,7 +93,6 @@ def main() -> None:
                 print(f"  [{r['idiom_phrase']}] {r['text_cree'][:80]}")
         return
 
-    # Build rows that match annotations.parquet schema
     new_rows = pd.DataFrame([{
         "paragraph_id":    None,
         "sentence_id":     None,

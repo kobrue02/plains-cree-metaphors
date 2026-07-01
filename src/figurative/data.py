@@ -55,11 +55,7 @@ def _load_vua20_sentences(split: str) -> list[dict]:
 
 
 def _load_flute() -> tuple[list[dict], list[dict]]:
-    """Extract figurative sentences from FLUTE (Entailment rows only).
-
-    Hypothesis of Entailment rows is the correctly-used figurative expression.
-    Contradiction rows are skipped (hypothesis misuses figurative language).
-    """
+    """Extract figurative sentences from FLUTE; uses hypothesis of Entailment rows only (Contradiction rows misuse the figure)."""
     _type_map = {"Idiom": IDIOM, "Metaphor": METAPHOR, "Simile": SIMILE}
     ds = load_dataset("ColumbiaNLP/FLUTE")["train"]
     records = []

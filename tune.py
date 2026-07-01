@@ -95,16 +95,7 @@ def run_calibrate(args: argparse.Namespace) -> None:
 
 
 def run_pipeline(args: argparse.Namespace) -> None:
-    """Joint CLKD → Calibrate sweep trial.
-
-    CLKD and Calibrate are coupled: freeze_n_layers determines how adapted the
-    model is to Cree, which determines how much LR calibration needs to move it.
-    Sweeping them jointly finds configs that work together, not in isolation.
-
-    Both stages log to the same wandb run. The sweep metric (eval/macro_f1) is
-    the final value logged by the calibration Trainer. Intermediate outputs are
-    deleted to keep disk usage bounded.
-    """
+    """Joint CLKD → Calibrate sweep trial; swept jointly because freeze_n_layers couples both stages."""
     import shutil
     from funcs import figurative_distill, calibrate
 

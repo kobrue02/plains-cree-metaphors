@@ -8,7 +8,6 @@ MODEL_ID = "deepseek-v4-pro"
 def _load_api_key() -> str:
     if key := os.environ.get("DEEPSEEK_API_KEY"):
         return key
-    # Walk up from this file to find a .env
     for directory in [Path(__file__).parent, *Path(__file__).parents]:
         env_file = directory / ".env"
         if env_file.exists():

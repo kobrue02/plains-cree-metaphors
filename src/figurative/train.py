@@ -49,8 +49,7 @@ def train(config: FigurativeConfig) -> str:
     if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
-    # DeBERTa-v3 fast-tokenizer conversion is broken in recent transformers
-    # (tiktoken tries to parse the SentencePiece .spm file as BPE).
+    # deberta-v3 fast tokenizer is broken in recent transformers (tiktoken misparses the spm file as bpe)
     use_fast = "deberta-v3" not in config.encoder.lower()
     tokenizer = AutoTokenizer.from_pretrained(config.encoder, use_fast=use_fast)
 

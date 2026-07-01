@@ -53,7 +53,7 @@ rate = (
     .reindex(MODELS_KEEP)
 )
 
-# ── Figure 1: Per-class consistency heatmap ────────────────────────────────────
+# ── figure 1: per-class consistency heatmap ────────────────────────────────────
 
 CLASSES      = ["literal", "idiom", "metaphor", "simile"]
 CLASS_LABELS = ["Literal", "Idiom", "Metaphor", "Simile"]
@@ -119,7 +119,7 @@ with open("figures/results_heatmap.tex", "w") as f:
 print("Wrote figures/results_heatmap.tex")
 
 
-# ── Figure 2: Label distribution on Bloomfield (stacked bar) ──────────────────
+# ── figure 2: label distribution on bloomfield (stacked bar) ──────────────────
 
 RATE_CLASSES = ["literal", "idiom", "metaphor", "simile"]
 RATE_LABELS  = ["Literal", "Idiom", "Metaphor", "Simile"]
@@ -175,7 +175,7 @@ with open("figures/results_figurative_dist.tex", "w") as f:
 print("Wrote figures/results_figurative_dist.tex")
 
 
-# ── Standalone compile wrapper ─────────────────────────────────────────────────
+# ── standalone compile wrapper ─────────────────────────────────────────────────
 
 wrapper_tex = r"""\documentclass[tikz, border=6pt]{standalone}
 \usepackage{pgfplots}

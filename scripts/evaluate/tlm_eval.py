@@ -66,8 +66,8 @@ def embed(model: AutoModel, tokenizer, sentences: list[str], device: str) -> np.
 def retrieval_metrics(src_embs: np.ndarray, tgt_embs: np.ndarray) -> dict[str, float]:
     src = src_embs / np.linalg.norm(src_embs, axis=1, keepdims=True).clip(1e-9)
     tgt = tgt_embs / np.linalg.norm(tgt_embs, axis=1, keepdims=True).clip(1e-9)
-    sim   = src @ tgt.T                               # (N, N)
-    ranks = np.argsort(-sim, axis=1)                  # descending similarity
+    sim   = src @ tgt.T
+    ranks = np.argsort(-sim, axis=1)
     gold  = np.arange(len(src))
     rank_of_gold = (ranks == gold[:, None]).argmax(1) + 1  # 1-indexed
 
@@ -113,7 +113,6 @@ def pseudo_perplexity(model: AutoModelForMaskedLM, tokenizer, sentences: list[st
         masked_ids = ids.clone()
         masked_ids[mask_positions] = tokenizer.mask_token_id
 
-        # Only compute loss on masked positions
         labels[~mask_positions] = -100
 
         with torch.no_grad():
@@ -140,14 +139,13 @@ def evaluate(model_name: str, cree: list[str], en: list[str], device: str) -> di
     # Use ForMaskedLM so we get both hidden states (for retrieval) and MLM head (for perplexity)
     mlm_model = AutoModelForMaskedLM.from_pretrained(model_name).to(device)
 
-    # Perplexity
     print("  Computing perplexity ...")
     ppl_cree = pseudo_perplexity(mlm_model, tokenizer, cree, device)
     ppl_en   = pseudo_perplexity(mlm_model, tokenizer, en,   device)
 
     # Retrieval — embeddings from the base model (strip MLM head)
     print("  Computing bitext retrieval ...")
-    base_model = mlm_model.base_model  # removes the LM head
+    base_model = mlm_model.base_model
     retr = bitext_retrieval(base_model, tokenizer, cree, en, device)
 
     return {
@@ -201,7 +199,6 @@ def main() -> None:
         all_results[label] = evaluate(model_name, cree, en, device)
         print_results(label, all_results[label])
 
-    # Delta summary when comparing
     if args.baseline and "Baseline" in all_results and "TLM" in all_results:
         base = all_results["Baseline"]
         tlm  = all_results["TLM"]

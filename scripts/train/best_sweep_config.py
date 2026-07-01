@@ -105,7 +105,6 @@ def fetch_best(sweep_path: str) -> dict:
     best = max(runs, key=score) if higher_is_better else min(runs, key=score)
     best_score = score(best)
 
-    # Extract only the parameters the sweep actually varied
     swept_params = set(sweep.config.get("parameters", {}).keys())
     swept_config = {k: v for k, v in best.config.items() if k in swept_params}
 
@@ -129,7 +128,6 @@ def build_pipeline_cmd(result: dict, use_sbatch: bool = False) -> str:
     prefix = "sbatch jobs/pipeline.sh" if use_sbatch else "python3 pipeline.py"
     parts = [prefix]
 
-    # Stage skips — only run the stages that were actually swept
     skip_map = {
         "calibrate": ["--skip-tlm", "--skip-clkd"],
         "clkd":      ["--skip-tlm", "--skip-calibrate"],
@@ -138,7 +136,6 @@ def build_pipeline_cmd(result: dict, use_sbatch: bool = False) -> str:
     }
     parts += skip_map.get(stage, [])
 
-    # Hyperparameters
     for param, flag in flags.items():
         if flag and param in cfg:
             val = cfg[param]
@@ -168,14 +165,12 @@ def main():
     print(f"Fetching sweep: {args.sweep_id} ...")
     result = fetch_best(args.sweep_id)
 
-    # Save
     os.makedirs(args.out_dir, exist_ok=True)
     slug = args.sweep_id.replace("/", "_")
     out_path = os.path.join(args.out_dir, f"{slug}.json")
     with open(out_path, "w") as f:
         json.dump(result, f, indent=2)
 
-    # Report
     print(f"\n{'─'*60}")
     print(f"  Stage   : {result['stage']}")
     print(f"  Metric  : {result['metric']} = {result['best_value']:.4f}")

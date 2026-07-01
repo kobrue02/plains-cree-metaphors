@@ -10,36 +10,17 @@ _SENT_BOUNDARY = re.compile(r'(?<=[.!?])\s+|\n')
 
 
 class ParallelSentenceSplitter:
-    """Split paragraph-aligned Cree/English data into sentence pairs.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        Must have columns ``text_cree`` and ``text_en``.
-    """
+    """Split paragraph-aligned Cree/English data into sentence pairs; df must have columns ``text_cree`` and ``text_en``."""
 
     def __init__(self, df: pd.DataFrame):
         self.df = df
 
     def split(self, min_chars: int = 20) -> pd.DataFrame:
-        """Return a sentence-level DataFrame.
+        """Return a sentence-level DataFrame (columns: paragraph_id, sentence_id, text_cree, text_en, confidence).
 
-        Paragraphs with equal sentence counts on both sides are zipped directly.
-        Mismatched counts are handled by a DP aligner (Gale-Church style, 1-1 /
-        1-2 / 2-1 / 3-1 / 1-3) that minimises cumulative character-length error.
-
-        A ``confidence`` score (0–1) reflects character-length proportionality;
-        use it to filter noisy pairs (e.g. ``df[df.confidence > 0.6]``).
-
-        Parameters
-        ----------
-        min_chars : int
-            Drop pairs where either side is shorter than this.
-
-        Returns
-        -------
-        pd.DataFrame
-            Columns: paragraph_id, sentence_id, text_cree, text_en, confidence
+        Equal-count paragraphs are zipped directly; mismatched counts use a DP aligner
+        (Gale-Church style, 1-1/1-2/2-1/3-1/1-3) minimising cumulative char-length error.
+        ``confidence`` (0–1) reflects character-length proportionality.
         """
         rows = []
         for para_id, row in enumerate(self.df.itertuples(index=False)):
@@ -68,20 +49,7 @@ class ParallelSentenceSplitter:
         return pd.DataFrame(rows)
 
     def write(self, path: str, min_confidence: float = 0.0) -> str:
-        """Write sentence pairs in ``src ||| tgt`` format.
-
-        Parameters
-        ----------
-        path : str
-            Output file path.
-        min_confidence : float
-            Only write pairs at or above this confidence threshold.
-
-        Returns
-        -------
-        str
-            The output path.
-        """
+        """Write sentence pairs in ``src ||| tgt`` format."""
         sent_df = self.split()
         if min_confidence > 0:
             sent_df = sent_df[sent_df.confidence >= min_confidence]
