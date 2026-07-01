@@ -59,7 +59,9 @@ def main() -> None:
     p.add_argument("--hub-prefix",  default="KonradBRG",
                    help="HF Hub user/org prefix (default: KonradBRG)")
 
-    # stage skipping
+    # stage skipping / additions
+    p.add_argument("--mono-mlm",       action="store_true",
+                   help="Stage 0: run monolingual Cree MLM before TLM (ablation E)")
     p.add_argument("--skip-tlm",       action="store_true", help="Skip TLM stage")
     p.add_argument("--skip-clkd",      action="store_true", help="Skip CLKD stage")
     p.add_argument("--skip-calibrate", action="store_true", help="Skip calibration stage")
@@ -111,6 +113,7 @@ def main() -> None:
     mid      = args.model_id
 
     # ── derived paths ──────────────────────────────────────────────────────────
+    mono_local  = local_dir(mid, "mono")
     tlm_local   = local_dir(mid, "tlm")
     clkd_local  = local_dir(mid, "clkd")
     cal_local   = local_dir(mid, "calibrated")
@@ -119,12 +122,33 @@ def main() -> None:
     clkd_hub = hub_id(prefix, mid, "clkd")
     cal_hub  = hub_id(prefix, mid, "calibrated")
 
-    # ── Stage 1: TLM ──────────────────────────────────────────────────────────
-    if not args.skip_tlm:
-        print(f"\n{'='*60}\n  Stage 1 · TLM  ({args.base_model})\n{'='*60}")
+    # ── Stage 0: Monolingual Cree MLM (ablation only) ─────────────────────────
+    # Warm up the model on Cree-only MLM before cross-lingual TLM.
+    # TLM (Stage 1) starts from this checkpoint instead of the base model.
+    tlm_base = args.base_model
+    if args.mono_mlm:
+        print(f"\n{'='*60}\n  Stage 0 · Mono MLM  ({args.base_model})\n{'='*60}")
         fine_tune(
             sentences_file=args.sentences_file,
             model_name=args.base_model,
+            output_dir=mono_local,
+            epochs=args.tlm_epochs,
+            learning_rate=args.tlm_lr,
+            batch_size=args.batch_size,
+            grad_accum=args.grad_accum,
+            max_length=args.max_length,
+            wandb_project=args.wandb_project,
+            src_col="text_cree",
+            tgt_col="text_cree",  # Cree-only: no cross-lingual signal
+        )
+        tlm_base = mono_local
+
+    # ── Stage 1: TLM ──────────────────────────────────────────────────────────
+    if not args.skip_tlm:
+        print(f"\n{'='*60}\n  Stage 1 · TLM  ({tlm_base})\n{'='*60}")
+        fine_tune(
+            sentences_file=args.sentences_file,
+            model_name=tlm_base,
             output_dir=tlm_local,
             epochs=args.tlm_epochs,
             learning_rate=args.tlm_lr,

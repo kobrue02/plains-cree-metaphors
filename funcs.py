@@ -89,8 +89,10 @@ def fine_tune(
     output_dir:     str  = "data/tlm_model",
     grad_accum:     int  = 2,
     max_length:     int  = 256,
+    src_col:        str  = "text_cree",
+    tgt_col:        str  = "text_en",
 ) -> str:
-    """ Fine-tune a TLM model on Cree-English sentence pairs and return the checkpoint path."""
+    """ Fine-tune a masked LM on sentence pairs (TLM) or monolingual text (pass tgt_col=src_col)."""
     if sentences_file:
         sent_df = pd.read_parquet(sentences_file)
         print(f"Loaded {len(sent_df):,} pairs from {sentences_file}")
@@ -101,7 +103,7 @@ def fine_tune(
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")
     cfg  = TLMConfig(model_name=model_name, output_dir=output_dir, epochs=epochs, batch_size=batch_size, learning_rate=learning_rate, grad_accum=grad_accum, max_length=max_length, hub_model_id=hub_model_id, wandb_project=wandb_project)
-    ckpt = TLMFinetuner(cfg).fit(sent_df)
+    ckpt = TLMFinetuner(cfg).fit(sent_df, src_col=src_col, tgt_col=tgt_col)
     return ckpt
 
 

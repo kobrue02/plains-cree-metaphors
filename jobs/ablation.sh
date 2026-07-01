@@ -109,6 +109,20 @@ run_or_print "neither (calibrate from base model directly)" \
       --calibrate-lr 5e-6 \
       --calibrate-epochs 15
 
+# ── Condition E: mono MLM → TLM → CLKD → calibrate ──────────────────────────
+# Stage 0: warm up on Cree-only MLM before cross-lingual TLM.
+# This is the most expensive ablation (~2h mono + ~2h TLM + ~2h CLKD + ~30min cal).
+run_or_print "mono_mlm (Cree MLM warmup → TLM → CLKD → calibrate)" \
+  sbatch \
+    --job-name=abl_mono_mlm \
+    --time=08:00:00 \
+    jobs/pipeline.sh \
+      --base-model "$BASE_MODEL" \
+      --model-id "${MODEL_ID}-abl-mono-mlm" \
+      --mono-mlm \
+      --calibrate-lr 5e-6 \
+      --calibrate-epochs 15
+
 echo ""
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "Dry run complete — no jobs submitted."
