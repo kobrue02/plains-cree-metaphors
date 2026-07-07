@@ -22,10 +22,12 @@ from transformers import (
     AutoTokenizer,
     DataCollatorForLanguageModeling,
     Trainer,
+    TrainerCallback,
     TrainingArguments,
 )
 
 from src.device import get_device, get_precision_kwargs
+from src.mt.tlm_eval import bitext_retrieval, pseudo_perplexity
 
 
 @dataclass
@@ -182,6 +184,35 @@ class TLMContrastiveTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
+class TLMRetrievalCallback(TrainerCallback):
+    """Logs pseudo-perplexity and cross-lingual bitext retrieval (the same
+    metrics scripts/evaluate/tlm_eval.py reports post-hoc) to wandb on every
+    eval pass, so alignment quality is visible across training, not just at
+    the end."""
+
+    def __init__(self, tokenizer, cree: list[str], en: list[str], device: str):
+        self.tokenizer = tokenizer
+        self.cree = cree
+        self.en   = en
+        self.device = device
+
+    def on_evaluate(self, args, state, control, model=None, **kwargs):
+        import wandb
+        if wandb.run is None or model is None:
+            return
+
+        ppl_cree = pseudo_perplexity(model, self.tokenizer, self.cree, self.device)
+        ppl_en   = pseudo_perplexity(model, self.tokenizer, self.en,   self.device)
+        retr     = bitext_retrieval(model.base_model, self.tokenizer, self.cree, self.en, self.device)
+
+        metrics = {"tlm_eval/ppl_cree": ppl_cree, "tlm_eval/ppl_en": ppl_en}
+        for direction, m in retr.items():
+            for k, v in m.items():
+                metrics[f"tlm_eval/{direction}_{k}"] = v
+        wandb.log(metrics, step=state.global_step)
+        model.train()
+
+
 class TLMFinetuner:
     """Fine-tune XLM-R (or any masked LM) on Cree-English parallel data via TLM.
 
@@ -284,6 +315,16 @@ class TLMFinetuner:
             **hub_kwargs,
         )
 
+        callbacks = []
+        if cfg.wandb_project and dev_pairs:
+            eval_sample = dev_pairs[:300]
+            callbacks.append(TLMRetrievalCallback(
+                tokenizer=tokenizer,
+                cree=[p[0] for p in eval_sample],
+                en=[p[1] for p in eval_sample],
+                device=device,
+            ))
+
         trainer_cls = TLMContrastiveTrainer if use_contrastive else Trainer
         trainer_kwargs = (
             {"contrastive_alpha": cfg.contrastive_alpha,
@@ -296,6 +337,7 @@ class TLMFinetuner:
             train_dataset=train_ds,
             eval_dataset=dev_ds,
             data_collator=collator,
+            callbacks=callbacks,
             **trainer_kwargs,
         )
 
