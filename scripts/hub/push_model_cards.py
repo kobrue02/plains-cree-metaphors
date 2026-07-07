@@ -166,7 +166,7 @@ Final deployed checkpoint for figurative language detection in Plains Cree.
 
 MODELS = [
 
-    # ── TLM checkpoints ───────────────────────────────────────────────────────
+    # ── TLM checkpoints — legacy (predate pipeline.py's short model-id naming) ──
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-tlm",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -181,6 +181,20 @@ MODELS = [
     ),
     dict(
         repo_id      = f"{AUTHOR}/xlm-v-base-plains-cree-en-tlm",
+        base_model   = "facebook/xlm-v-base",
+        stage        = "tlm",
+        stage_kwargs = dict(epochs=15, max_length=128),
+    ),
+
+    # ── TLM checkpoints — base pipeline (pipeline.py --model-id xlm-mlm/xlm-v) ──
+    dict(
+        repo_id      = f"{AUTHOR}/xlm-mlm-plains-cree-en-tlm",
+        base_model   = "FacebookAI/xlm-mlm-100-1280",
+        stage        = "tlm",
+        stage_kwargs = dict(epochs=15),
+    ),
+    dict(
+        repo_id      = f"{AUTHOR}/xlm-v-plains-cree-en-tlm",
         base_model   = "facebook/xlm-v-base",
         stage        = "tlm",
         stage_kwargs = dict(epochs=15, max_length=128),
@@ -299,6 +313,20 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
         base_model   = "facebook/xlm-v-base",
         stage        = "clkd",
         stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-v-base-plains-cree-en-tlm"),
+    ),
+
+    # ── CLKD models — base pipeline (pipeline.py --model-id xlm-mlm/xlm-v) ──────
+    dict(
+        repo_id      = f"{AUTHOR}/xlm-mlm-plains-cree-en-clkd",
+        base_model   = "FacebookAI/xlm-mlm-100-1280",
+        stage        = "clkd",
+        stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-mlm-plains-cree-en-tlm"),
+    ),
+    dict(
+        repo_id      = f"{AUTHOR}/xlm-v-plains-cree-en-clkd",
+        base_model   = "facebook/xlm-v-base",
+        stage        = "clkd",
+        stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-v-plains-cree-en-tlm"),
     ),
 
     # ── Calibrated models — base pipeline (pipeline.py, --model-id xlm-mlm/glot500/xlm-v) ──

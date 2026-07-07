@@ -39,6 +39,8 @@ COLLECTIONS = [
             f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-tlm",
             f"{AUTHOR}/glot500-base-plains-cree-en-tlm",
             f"{AUTHOR}/xlm-v-base-plains-cree-en-tlm",
+            f"{AUTHOR}/xlm-mlm-plains-cree-en-tlm",
+            f"{AUTHOR}/xlm-v-plains-cree-en-tlm",
         ],
     ),
     dict(
@@ -63,6 +65,8 @@ COLLECTIONS = [
             f"{AUTHOR}/glot500-base-plains-cree-en-clkd-tlm",
             f"{AUTHOR}/xlm-v-base-plains-cree-en-clkd-direct",
             f"{AUTHOR}/xlm-v-base-plains-cree-en-clkd-tlm",
+            f"{AUTHOR}/xlm-mlm-plains-cree-en-clkd",
+            f"{AUTHOR}/xlm-v-plains-cree-en-clkd",
         ],
     ),
     dict(

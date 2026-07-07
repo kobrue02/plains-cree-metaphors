@@ -85,6 +85,10 @@ _VALIDATION_MODELS = [
     ("Glot500 CLKD direct",   "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
     ("Glot500 CLKD + TLM",    "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
     ("XLM-V CLKD direct",     "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
+    # ── CLKD, pre-calibration — base pipeline (pipeline.py), matched lineage with
+    # the calibrated entries right below, for a clean does-calibration-help check ──
+    ("XLM-MLM CLKD (pre-calibration)", "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
+    ("XLM-V CLKD (pre-calibration)",   "KonradBRG/xlm-v-plains-cree-en-clkd"),
     # ── calibrated — base pipeline (pipeline.py) ──────────────────────────────
     ("XLM-MLM calibrated",    "KonradBRG/xlm-mlm-plains-cree-en-calibrated"),
     ("Glot500 calibrated",    "KonradBRG/glot500-plains-cree-en-calibrated"),
