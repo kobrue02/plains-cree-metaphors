@@ -322,7 +322,8 @@ def _distill_clkd(config: DistillConfig) -> str:
             global_step += 1
             if _wandb and _wandb.run:
                 _wandb.log({"train/loss_step": loss.item(),
-                            "train/lr": scheduler.get_last_lr()[0]}, step=global_step)
+                            "train/lr": scheduler.get_last_lr()[0],
+                            "train/clkd_step": global_step})
 
         avg_loss = epoch_loss / len(loader)
 
@@ -349,7 +350,8 @@ def _distill_clkd(config: DistillConfig) -> str:
                 "train/loss_epoch": avg_loss,
                 "eval/kl_epoch":    eval_avg,
                 "epoch":            epoch + 1,
-            }, step=global_step)
+                "train/clkd_step":  global_step,
+            })
 
     student.save_pretrained(config.output_dir)
     student_tokenizer.save_pretrained(config.output_dir)
