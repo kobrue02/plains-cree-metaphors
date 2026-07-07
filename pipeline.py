@@ -18,8 +18,14 @@ Examples:
   # XLM-V needs shorter max-length to avoid OOM
   python pipeline.py --base-model facebook/xlm-v-base --model-id xlm-v --max-length 128
 
-  # Glot500, skip TLM (already on Hub)
-  python pipeline.py --base-model cis-lmu/glot500-base --model-id glot500 --skip-tlm
+  # Glot500, skip TLM — reuse the legacy TLM checkpoint (pushed under a
+  # different --model-id than this run, so point CLKD at it explicitly;
+  # --skip-tlm alone would look for the nonexistent KonradBRG/glot500-plains-cree-en-tlm)
+  python pipeline.py --base-model cis-lmu/glot500-base --model-id glot500 \
+      --skip-tlm --clkd-from KonradBRG/glot500-base-plains-cree-en-tlm
+
+  # Same caveat applies to XLM-V if you ever skip its TLM stage:
+  # --clkd-from KonradBRG/xlm-v-base-plains-cree-en-tlm
 
   # Resume from existing CLKD checkpoint, only calibrate
   python pipeline.py --model-id xlm-mlm --skip-tlm --skip-clkd

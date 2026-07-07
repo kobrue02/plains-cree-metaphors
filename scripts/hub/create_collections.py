@@ -49,7 +49,7 @@ COLLECTIONS = [
             f"{AUTHOR}/deberta-v3-base-figurative",
             f"{AUTHOR}/xlm-r-plains-cree-en-tlm-figurative",
             f"{AUTHOR}/xlm-r-large-plains-cree-en-tlm-figurative",
-            f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-figurative",
+            f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-tlm-figurative",
         ],
     ),
     dict(

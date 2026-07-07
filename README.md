@@ -76,8 +76,12 @@ python pipeline.py --base-model FacebookAI/xlm-mlm-100-1280 --model-id xlm-mlm
 # XLM-V needs a shorter max length to avoid OOM (large vocab)
 python pipeline.py --base-model facebook/xlm-v-base --model-id xlm-v --max-length 128
 
-# Glot500 is already multilingual — skip TLM warmup
-python pipeline.py --base-model cis-lmu/glot500-base --model-id glot500 --skip-tlm
+# Glot500 is already multilingual — skip TLM warmup and reuse the legacy TLM
+# checkpoint explicitly (it was pushed under --model-id glot500-base, not glot500 —
+# bare --skip-tlm would look for the nonexistent KonradBRG/glot500-plains-cree-en-tlm)
+python pipeline.py --base-model cis-lmu/glot500-base --model-id glot500 \
+    --skip-tlm --clkd-from KonradBRG/glot500-base-plains-cree-en-tlm
+# same caveat for XLM-V: --clkd-from KonradBRG/xlm-v-base-plains-cree-en-tlm
 
 # Resume from an existing CLKD checkpoint, only run calibration
 python pipeline.py --model-id xlm-mlm --skip-tlm --skip-clkd

@@ -247,7 +247,7 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
     ),
 
     dict(
-        repo_id    = f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-figurative",
+        repo_id    = f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-tlm-figurative",
         base_model = "FacebookAI/xlm-mlm-100-1280",
         tags       = ["figurative-language", "text-classification", "plains-cree", "low-resource"],
         task       = "text-classification",

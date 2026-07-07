@@ -41,7 +41,7 @@ _CHECKPOINTS = [
     # ── baselines ────────────────────────────────────────────────────────────
     ("XLM-R base (figurative)",           "KonradBRG/xlm-r-plains-cree-en-tlm-figurative"),
     ("XLM-R large (figurative)",          "KonradBRG/xlm-r-large-plains-cree-en-tlm-figurative"),
-    ("XLM-MLM (figurative)",              "KonradBRG/xlm-mlm-100-1280-plains-cree-en-figurative"),
+    ("XLM-MLM (figurative)",              "KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative"),
     ("DeBERTa-v3 (English teacher)",      "KonradBRG/deberta-v3-base-figurative"),
     # ── clkd : xlm-mlm student ──────────────────────────────────────────────
     ("XLM-MLM CLKD frozen-12",            "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12"),
