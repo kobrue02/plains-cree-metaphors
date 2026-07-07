@@ -5,7 +5,6 @@ from tqdm import tqdm
 
 from src.scrapers import BloomfieldScraper, EdTeKLAScraper
 from src.eda import EDA
-from src.annotate import call_deepseek, format_prompt
 from src.mt import TLMFinetuner, TLMConfig, ParallelSentenceSplitter
 from src.figurative import config as figurative_config
 from src.figurative.train import train as figurative_train_fn
@@ -53,6 +52,8 @@ def eda(df: pd.DataFrame | None = None) -> None:
 
 def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
     """Run LLM annotation on the Bloomfield paragraphs and save to data/bloomfield_texts_annotated.csv."""
+    from src.annotate import call_deepseek, format_prompt
+
     path = "data/bloomfield_texts_annotated.parquet"
     if df is None:
         src = path if os.path.exists(path) else "data/bloomfield_texts.parquet"
