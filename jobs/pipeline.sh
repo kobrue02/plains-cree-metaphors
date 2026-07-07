@@ -28,10 +28,11 @@ echo "CUDA: $CUDA_HOME"
 # 2. Environment
 export CUDA_VISIBLE_DEVICES=0
 export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
+export HF_HOME=$WORK/cache/huggingface
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export TOKENIZERS_PARALLELISM=false
 export PYTHONUNBUFFERED=1
-mkdir -p $TORCH_EXTENSIONS_DIR
+mkdir -p $TORCH_EXTENSIONS_DIR $HF_HOME
 
 # 3. Project
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors

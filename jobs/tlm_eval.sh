@@ -21,6 +21,8 @@ module load devel/python/3.13.3-llvm-19.1
 export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM=false
 export PYTHONUNBUFFERED=1
+export HF_HOME=$WORK/cache/huggingface
+mkdir -p $HF_HOME
 
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
 source $PROJECT_ROOT/.venv/bin/activate
