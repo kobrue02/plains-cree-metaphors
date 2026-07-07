@@ -30,6 +30,8 @@ import os, sys, argparse
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from funcs import fine_tune, figurative_distill, calibrate
+from scripts.hub.push_model_cards import push_card_for
+from scripts.hub.create_collections import add_model_to_collection
 
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
 SENTENCES_FILE = "data/sentences.parquet"
@@ -38,6 +40,14 @@ ANNOT_FILE     = "data/figurative/annotations.parquet"
 
 def hub_id(prefix: str, model_id: str, stage: str) -> str:
     return f"{prefix}/{model_id}-plains-cree-en-{stage}"
+
+
+def publish(repo_id: str, stage: str, base_model: str, **stage_kwargs) -> None:
+    """Push a model card and add the checkpoint to its Hub collection.
+    Called right after a stage pushes weights, so cards/collections stay current
+    without a manual step. Best-effort — must not fail an otherwise-successful job."""
+    push_card_for(repo_id, stage, base_model, **stage_kwargs)
+    add_model_to_collection(repo_id, stage)
 
 
 def local_dir(model_id: str, stage: str) -> str:
@@ -162,6 +172,14 @@ def main() -> None:
             contrastive_temperature=args.contrastive_temperature,
         )
         tlm_ckpt = tlm_local
+        if args.push_intermediates:
+            publish(
+                tlm_hub, "tlm", args.base_model,
+                epochs=args.tlm_epochs, batch_size=args.batch_size, max_length=args.max_length,
+                warm_start=mono_local if args.mono_mlm else None,
+                contrastive_alpha=args.contrastive_alpha,
+                contrastive_temperature=args.contrastive_temperature,
+            )
     else:
         tlm_ckpt = tlm_local if os.path.isdir(tlm_local) else tlm_hub
         print(f"\nSkipping TLM — using checkpoint: {tlm_ckpt}")
@@ -185,6 +203,13 @@ def main() -> None:
             wandb_project=args.wandb_project,
         )
         clkd_ckpt = clkd_local
+        if args.push_intermediates:
+            publish(
+                clkd_hub, "clkd", args.base_model,
+                student_base=clkd_input, teacher=args.teacher,
+                freeze_n_layers=args.freeze_layers, temperature=args.clkd_temperature,
+                epochs=args.clkd_epochs, tlm_warmup=(clkd_input != args.base_model),
+            )
     else:
         clkd_ckpt = clkd_local if os.path.isdir(clkd_local) else clkd_hub
         print(f"\nSkipping CLKD — using checkpoint: {clkd_ckpt}")
@@ -205,6 +230,12 @@ def main() -> None:
             max_length=min(args.max_length, 128),
             gold_only=args.gold_only,
             wandb_project=args.wandb_project,
+        )
+        publish(
+            cal_hub, "calibrated", args.base_model,
+            student_base=cal_input, literal_ratio=args.literal_ratio,
+            gold_only=args.gold_only, epochs=args.calibrate_epochs,
+            learning_rate=args.calibrate_lr,
         )
 
     print(f"\n{'='*60}")
