@@ -316,7 +316,7 @@ class TLMFinetuner:
         )
 
         callbacks = []
-        if cfg.wandb_project and dev_pairs:
+        if cfg.wandb_project and dev_pairs and src_col != tgt_col:
             eval_sample = dev_pairs[:300]
             callbacks.append(TLMRetrievalCallback(
                 tokenizer=tokenizer,
