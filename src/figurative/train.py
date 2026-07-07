@@ -18,7 +18,7 @@ from transformers import (
 )
 
 from src.figurative.config import FigurativeConfig
-from src.figurative.data import build_datasets, class_weights_from, LABEL_NAMES, NUM_LABELS
+from src.figurative.data import build_datasets, class_weights_from, resolve_use_fast, LABEL_NAMES, NUM_LABELS
 from src.figurative.evaluate import compute_metrics
 from src.device import get_precision_kwargs
 
@@ -49,9 +49,7 @@ def train(config: FigurativeConfig) -> str:
     if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
-    # deberta-v3 fast tokenizer is broken in recent transformers (tiktoken misparses the spm file as bpe)
-    use_fast = "deberta-v3" not in config.encoder.lower()
-    tokenizer = AutoTokenizer.from_pretrained(config.encoder, use_fast=use_fast)
+    tokenizer = AutoTokenizer.from_pretrained(config.encoder, use_fast=resolve_use_fast(config.encoder))
 
     model = AutoModelForSequenceClassification.from_pretrained(
         config.encoder,
@@ -105,8 +103,8 @@ def train(config: FigurativeConfig) -> str:
     )
 
     trainer.train()
-    trainer.save_model(config.checkpoint_dir)
     tokenizer.save_pretrained(config.checkpoint_dir)
+    trainer.save_model(config.checkpoint_dir)
     print(f"[train] saved to {config.checkpoint_dir}")
 
     if config.hub_model_id:

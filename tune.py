@@ -70,6 +70,7 @@ def run_clkd(args: argparse.Namespace) -> None:
         learning_rate=cfg.get("learning_rate", 5e-6),
         temperature=cfg.get("temperature", 2.0),
         freeze_n_layers=cfg.get("freeze_n_layers", 0),
+        max_length=args.max_length,
         output_dir=output_dir,
         wandb_project=WANDB_PROJECT,
     )
@@ -117,6 +118,7 @@ def run_pipeline(args: argparse.Namespace) -> None:
             learning_rate=float(cfg.get("clkd_lr", 5e-6)),
             temperature=float(cfg.get("clkd_temperature", 4.0)),
             freeze_n_layers=int(cfg.get("clkd_freeze_layers", 6)),
+            max_length=args.max_length,
             output_dir=clkd_dir,
             wandb_project=WANDB_PROJECT,
         )

@@ -32,6 +32,13 @@ _MIN_LEN   = 20
 # Minimum ratio of alphabetic characters (filters OCR garbage)
 _MIN_ALPHA = 0.45
 
+# Skip lines that are only English (translator notes that slipped through)
+_EN_WORDS = frozenset({
+    "the","he","she","was","had","his","her","and","then","to","of",
+    "that","this","it","in","for","on","at","by","with","as","said",
+    "not","but","they","them","were","from","when","all","one","have",
+})
+
 
 def split_cree_sentences(para: str) -> list[str]:
     """
@@ -62,12 +69,6 @@ def _keep(text: str) -> bool:
     alpha = sum(1 for c in text if c.isalpha())
     if alpha / len(text) < _MIN_ALPHA:
         return False
-    # Skip lines that are only English (translator notes that slipped through)
-    _EN_WORDS = frozenset({
-        "the","he","she","was","had","his","her","and","then","to","of",
-        "that","this","it","in","for","on","at","by","with","as","said",
-        "not","but","they","them","were","from","when","all","one","have",
-    })
     words = re.findall(r"\b[a-z]+\b", text.lower())
     if len(words) >= 6:
         en_ratio = sum(1 for w in words if w in _EN_WORDS) / len(words)

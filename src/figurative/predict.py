@@ -8,14 +8,13 @@ import torch
 import pandas as pd
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
-from src.figurative.data import LABEL_NAMES
+from src.figurative.data import LABEL_NAMES, resolve_use_fast
 
 
 def load_model(
     checkpoint: str,
 ) -> tuple[AutoModelForSequenceClassification, AutoTokenizer]:
-    use_fast = "deberta-v3" not in checkpoint.lower()
-    tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=use_fast)
+    tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=resolve_use_fast(checkpoint))
     model = AutoModelForSequenceClassification.from_pretrained(
         checkpoint, torch_dtype=torch.float32,
     )

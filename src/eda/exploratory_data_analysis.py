@@ -44,7 +44,7 @@ class EDA:
                 lambda r, c=col: self._avg_words_per_sent(r[c]), axis=1
             )
         df["word_ratio_crk_en"] = df["word_count_crk"] / df["word_count_en"].replace(0, float("nan"))
-        df["has_footnote"] = df["footnote_en"] != ""
+        df["has_footnote"] = df["footnote_en"].notna() & (df["footnote_en"].str.strip() != "")
         return df
 
     def _summary_frame(self, per_para: pd.DataFrame) -> pd.DataFrame:
@@ -190,7 +190,7 @@ class EDA:
             words, counts = zip(*top)
 
             ax = axes[0 if lang == "crk" else 1]
-            ax.barh(range(len(words)), counts, color=color, alpha=0.8)
+            ax.barh(range(len(words)), counts, color=color, alpha=0.8, label=label)
             ax.set_yticks(range(len(words)))
             ax.set_yticklabels(words, fontsize=9)
             ax.invert_yaxis()

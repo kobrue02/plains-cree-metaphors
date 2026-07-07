@@ -204,6 +204,7 @@ def main() -> None:
             batch_size=args.batch_size,
             learning_rate=args.clkd_lr,
             temperature=args.clkd_temperature,
+            max_length=args.max_length,
             output_dir=clkd_local,
             hub_model_id=clkd_hub if args.push_intermediates else None,
             wandb_project=args.wandb_project,

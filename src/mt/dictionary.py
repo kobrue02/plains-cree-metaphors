@@ -58,7 +58,8 @@ class ItwewinaClient:
         syllabics = span.get("data-orth-cans", "") if span else ""
 
         elab       = article.find("div", class_="definition__elaboration")
-        word_class = elab.get_text(separator=" ").split()[0] if elab else ""
+        elab_words = elab.get_text(separator=" ").split() if elab else []
+        word_class = elab_words[0] if elab_words else ""
 
         lb       = article.find("div", attrs={"data-cy": "linguistic-breakdown"})
         pos_tags = [li.get_text(strip=True) for li in lb.find_all("li")] if lb else []

@@ -1,10 +1,11 @@
+import os
 import requests, base64
 
 
 invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
 stream = False
 
-API_KEY = "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"
+API_KEY = os.environ["NVIDIA_API_KEY"]
 MODEL_ID = "mistralai/mistral-medium-3.5-128b"
 
 

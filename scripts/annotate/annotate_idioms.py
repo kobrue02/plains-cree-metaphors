@@ -36,9 +36,10 @@ def _normalise(text: str) -> str:
 
 def scan(pool: pd.DataFrame, idioms: list[tuple[str, str]]) -> list[dict]:
     rows = []
+    normalised_texts = pool["text_cree"].apply(lambda t: _normalise(str(t)))
     for cree_phrase, english_meaning in idioms:
         pattern = _normalise(cree_phrase)
-        mask    = pool["text_cree"].apply(lambda t: pattern in _normalise(str(t)))
+        mask    = normalised_texts.apply(lambda t: pattern in t)
         matches = pool[mask]
         print(f"  {cree_phrase!r:50s} → {len(matches)} match(es)")
         for _, row in matches.iterrows():

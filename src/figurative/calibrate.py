@@ -22,7 +22,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from src.figurative.data import FigurativeDataset, class_weights_from, LABEL_NAMES, NUM_LABELS
+from src.figurative.data import FigurativeDataset, class_weights_from, resolve_use_fast, LABEL_NAMES, NUM_LABELS
 from src.figurative.evaluate import compute_metrics
 from src.figurative.config import FigurativeConfig
 
@@ -105,8 +105,7 @@ def calibrate(config: CalibrateConfig) -> str:
     )
     print(f"[calibrate] train={len(train_recs)}  eval={len(eval_recs)}")
 
-    use_fast  = "deberta-v3" not in config.checkpoint.lower()
-    tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=use_fast)
+    tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
 
     ds_config = FigurativeConfig(encoder=config.checkpoint,
                                  max_length=config.max_length,
@@ -159,8 +158,8 @@ def calibrate(config: CalibrateConfig) -> str:
 
     print(f"[calibrate] starting from {config.checkpoint}")
     trainer.train()
-    trainer.save_model(config.output_dir)
     tokenizer.save_pretrained(config.output_dir)
+    trainer.save_model(config.output_dir)
     print(f"[calibrate] saved → {config.output_dir}")
 
     if config.hub_model_id:

@@ -38,6 +38,8 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from src.figurative.data import resolve_use_fast
+
 try:
     import wandb as _wandb
 except ImportError:
@@ -211,8 +213,9 @@ def _distill_clkd(config: DistillConfig) -> str:
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     print(f"[distill] loading teacher : {config.teacher_checkpoint}")
-    _t_use_fast = "deberta-v3" not in config.teacher_checkpoint.lower()
-    teacher_tokenizer = AutoTokenizer.from_pretrained(config.teacher_checkpoint, use_fast=_t_use_fast)
+    teacher_tokenizer = AutoTokenizer.from_pretrained(
+        config.teacher_checkpoint, use_fast=resolve_use_fast(config.teacher_checkpoint),
+    )
     teacher = AutoModelForSequenceClassification.from_pretrained(
         config.teacher_checkpoint, torch_dtype=torch.float32,
     )
@@ -222,7 +225,7 @@ def _distill_clkd(config: DistillConfig) -> str:
     print(f"[distill] teacher frozen  — {sum(p.numel() for p in teacher.parameters()):,} params")
 
     print(f"[distill] loading student : {config.checkpoint}")
-    student_tokenizer = AutoTokenizer.from_pretrained(config.checkpoint)
+    student_tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
     student = AutoModelForSequenceClassification.from_pretrained(
         config.checkpoint,
         num_labels=config.num_labels,
@@ -372,7 +375,7 @@ def _distill_self(config: DistillConfig) -> str:
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    tokenizer = AutoTokenizer.from_pretrained(config.checkpoint)
+    tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
     model = AutoModelForSequenceClassification.from_pretrained(
         config.checkpoint, torch_dtype=torch.float32,
     )

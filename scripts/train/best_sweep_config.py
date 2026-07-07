@@ -65,7 +65,7 @@ METRIC_FALLBACK = {
 
 def _infer_stage(run) -> str:
     """Guess the stage from the run command or config."""
-    cmd = getattr(run, "metadata", {}).get("args", [])
+    cmd = (getattr(run, "metadata", None) or {}).get("args", [])
     for c in cmd:
         if c in ("calibrate", "clkd", "tlm", "pipeline"):
             return c

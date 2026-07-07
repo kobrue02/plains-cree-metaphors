@@ -40,6 +40,11 @@ LABEL_NAMES = ["literal", "idiom", "metaphor", "simile"]
 NUM_LABELS  = len(LABEL_NAMES)
 
 
+def resolve_use_fast(checkpoint: str) -> bool:
+    """deberta-v3 fast tokenizers are broken in recent transformers (tiktoken misparses the spm file as bpe)."""
+    return "deberta-v3" not in checkpoint.lower()
+
+
 # ── raw loaders ───────────────────────────────────────────────────────────────
 
 def _load_vua20_sentences(split: str) -> list[dict]:

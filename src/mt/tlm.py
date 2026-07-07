@@ -79,8 +79,10 @@ class TLMDataset(Dataset):
                 "input_ids":      enc["input_ids"],
                 "attention_mask": enc["attention_mask"],
             }
-            # xlm-r always emits zero token_type_ids; xlm uses them to distinguish segments
-            if enc.get("token_type_ids") and any(enc["token_type_ids"]):
+            # include unconditionally when present: per-example inclusion (e.g. gated on
+            # any(token_type_ids)) would make some batch items miss the key whenever
+            # truncation zeroes out a segment, and tokenizer.pad() requires consistent keys
+            if "token_type_ids" in enc:
                 example["token_type_ids"] = enc["token_type_ids"]
 
             if with_contrastive:
@@ -276,6 +278,7 @@ class TLMFinetuner:
             greater_is_better=False,
             logging_steps=50,
             report_to="wandb" if cfg.wandb_project else "none",
+            remove_unused_columns=not use_contrastive,
             **get_precision_kwargs(),
             seed=cfg.seed,
             **hub_kwargs,
@@ -297,12 +300,13 @@ class TLMFinetuner:
         )
 
         trainer.train()
-        trainer.save_model(cfg.output_dir)
+        # save the tokenizer before save_model, since save_model triggers push_to_hub
+        # (when args.push_to_hub is set) and a failed push must not skip this step
         tokenizer.save_pretrained(cfg.output_dir)
+        trainer.save_model(cfg.output_dir)
         print(f"[TLM] saved to {cfg.output_dir}")
 
         if cfg.hub_model_id:
-            trainer.push_to_hub()
             print(f"[TLM] pushed to hub: {cfg.hub_model_id}")
 
         return cfg.output_dir

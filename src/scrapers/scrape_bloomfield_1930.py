@@ -113,8 +113,8 @@ def _merge_fragments(paras: list[str]) -> list[str]:
                 buf = buf.rstrip() + " " + p.lstrip()
         else:
             buf = p
-        tail = buf.rstrip().rstrip(“\””’’”)
-        if tail and tail[-1] in “.!?” and len(buf.split()) >= 8:
+        tail = buf.rstrip().rstrip("\"'”’")
+        if tail and tail[-1] in ".!?" and len(buf.split()) >= 8:
             merged.append(buf.strip())
             buf = ""
     if buf.strip():

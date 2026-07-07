@@ -156,10 +156,10 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
     # only low-confidence sentences — high-conf figurative become pseudo-labels in phase_retrain
     queue = pool[pool["confidence"] < LOW_CONF].copy()
 
-    done_texts: set[str] = set()
+    existing_annot: pd.DataFrame | None = None
     if os.path.exists(ANNOT_FILE):
-        done_all = pd.read_parquet(ANNOT_FILE)
-        active_done = done_all[done_all["source"] == "active_deepseek"]
+        existing_annot = pd.read_parquet(ANNOT_FILE)
+        active_done = existing_annot[existing_annot["source"] == "active_deepseek"]
         done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
         queue = queue[~queue["text_cree"].isin(done_texts)]
 
@@ -211,9 +211,8 @@ def phase_annotate(pool: pd.DataFrame, max_annotate: int) -> pd.DataFrame:
 
     new_df = pd.DataFrame(rows)
 
-    if os.path.exists(ANNOT_FILE):
-        existing = pd.read_parquet(ANNOT_FILE)
-        new_df = pd.concat([existing, new_df], ignore_index=True)
+    if existing_annot is not None:
+        new_df = pd.concat([existing_annot, new_df], ignore_index=True)
 
     new_df.drop_duplicates(subset=["text_cree"], inplace=True)
     new_df.to_parquet(ANNOT_FILE, index=False)
@@ -406,10 +405,11 @@ def cmd_annotate(args) -> None:
 
     pool = pd.read_parquet(ACTIVE_POOL)
 
+    existing_annot: pd.DataFrame | None = None
     done_texts: set[str] = set()
     if os.path.exists(ANNOT_FILE):
-        done_all = pd.read_parquet(ANNOT_FILE)
-        active_done = done_all[done_all["source"].str.startswith("active_", na=False)]
+        existing_annot = pd.read_parquet(ANNOT_FILE)
+        active_done = existing_annot[existing_annot["source"].str.startswith("active_", na=False)]
         done_texts = set(active_done["text_cree"].dropna().str.strip().tolist())
 
     queue = pool[
@@ -458,9 +458,8 @@ def cmd_annotate(args) -> None:
         return
 
     new_df = pd.DataFrame(annotated_rows)
-    if os.path.exists(ANNOT_FILE):
-        existing = pd.read_parquet(ANNOT_FILE)
-        new_df = pd.concat([existing, new_df], ignore_index=True)
+    if existing_annot is not None:
+        new_df = pd.concat([existing_annot, new_df], ignore_index=True)
     new_df.drop_duplicates(subset=["text_cree"], inplace=True)
     new_df.to_parquet(ANNOT_FILE, index=False)
     print(f"\nSaved {len(annotated_rows)} annotations → {ANNOT_FILE}")
