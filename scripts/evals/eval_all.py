@@ -85,8 +85,17 @@ _VALIDATION_MODELS = [
     ("Glot500 CLKD direct",   "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
     ("Glot500 CLKD + TLM",    "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
     ("XLM-V CLKD direct",     "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
+    # ── calibrated — base pipeline (pipeline.py) ──────────────────────────────
     ("XLM-MLM calibrated",    "KonradBRG/xlm-mlm-plains-cree-en-calibrated"),
+    ("Glot500 calibrated",    "KonradBRG/glot500-plains-cree-en-calibrated"),
     ("XLM-V calibrated",      "KonradBRG/xlm-v-plains-cree-en-calibrated"),
+    # ── calibrated — ablation study (jobs/ablation.sh, xlm-mlm base) ──────────
+    ("Ablation: full",            "KonradBRG/xlm-mlm-abl-full-plains-cree-en-calibrated"),
+    ("Ablation: no TLM",          "KonradBRG/xlm-mlm-abl-no-tlm-plains-cree-en-calibrated"),
+    ("Ablation: no CLKD",         "KonradBRG/xlm-mlm-abl-no-clkd-plains-cree-en-calibrated"),
+    ("Ablation: neither",         "KonradBRG/xlm-mlm-abl-neither-plains-cree-en-calibrated"),
+    ("Ablation: mono-MLM warmup", "KonradBRG/xlm-mlm-abl-mono-mlm-plains-cree-en-calibrated"),
+    ("Ablation: TLM+contrastive", "KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-calibrated"),
 ]
 
 CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"

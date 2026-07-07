@@ -37,7 +37,7 @@ mkdir -p logs
 
 # 4. Run evaluation
 echo "=== Validation set evaluation ==="
-python3 scripts/evals/eval_validation_set.py
+python3 scripts/evals/eval_all.py --task validation
 
 echo "Results in data/figurative/eval_validation_full.csv"
 echo "           data/figurative/eval_validation_gold.csv"
