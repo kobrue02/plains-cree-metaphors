@@ -1,11 +1,27 @@
 import os
 import requests, base64
+from pathlib import Path
 
 
 invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
 stream = False
 
-API_KEY = os.environ["NVIDIA_API_KEY"]
+
+def _load_api_key() -> str:
+    if key := os.environ.get("NVIDIA_API_KEY"):
+        return key
+    for directory in [Path(__file__).parent, *Path(__file__).parents]:
+        env_file = directory / ".env"
+        if env_file.exists():
+            for line in env_file.read_text().splitlines():
+                if line.startswith("NVIDIA_API_KEY="):
+                    return line.split("=", 1)[1].strip()
+    raise RuntimeError(
+        "NVIDIA_API_KEY not found. Set it in the environment or in a .env file."
+    )
+
+
+API_KEY = _load_api_key()
 MODEL_ID = "mistralai/mistral-medium-3.5-128b"
 
 
