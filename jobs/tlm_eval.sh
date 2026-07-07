@@ -15,16 +15,17 @@
 #   sbatch jobs/tlm_eval.sh
 #   sbatch jobs/tlm_eval.sh --model data/tlm_xlm-mlm --n 500
 
+PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
+
 module load devel/cuda/12.8
 module load devel/python/3.13.3-llvm-19.1
 
 export CUDA_VISIBLE_DEVICES=0
 export TOKENIZERS_PARALLELISM=false
 export PYTHONUNBUFFERED=1
-export HF_HOME=$WORK/cache/huggingface
+export HF_HOME=$PROJECT_ROOT/.cache/huggingface
 mkdir -p $HF_HOME
 
-PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
 source $PROJECT_ROOT/.venv/bin/activate
 cd $PROJECT_ROOT
 uv sync

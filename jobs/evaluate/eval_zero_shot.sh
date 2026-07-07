@@ -16,22 +16,25 @@
 #   (2) eval_figurative_rate.py — predicted label distribution on Bloomfield corpus
 #   (3) eval_simile_detection.py — tâpiskôc silver-standard simile test
 
-# 1. Load Modules
+# 1. Project root (defined first — cache paths below anchor to it, not $WORK,
+#    which is unset in the batch environment on this cluster)
+PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
+
+# 2. Load Modules
 module load devel/cuda/12.8
 module load devel/python/3.13.3-llvm-19.1
 echo "CUDA Home: $CUDA_HOME"
 
-# 2. Environment Variables
+# 3. Environment Variables
 export CUDA_VISIBLE_DEVICES=0
-export TORCH_EXTENSIONS_DIR=$WORK/cache/torch_extensions
-export HF_HOME=$WORK/cache/huggingface
+export TORCH_EXTENSIONS_DIR=$PROJECT_ROOT/.cache/torch_extensions
+export HF_HOME=$PROJECT_ROOT/.cache/huggingface
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export TOKENIZERS_PARALLELISM=false
 export PYTHONUNBUFFERED=1
 mkdir -p $TORCH_EXTENSIONS_DIR $HF_HOME
 
-# 3. Project Setup
-PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
+# 4. Project Setup
 source $PROJECT_ROOT/.venv/bin/activate
 cd $PROJECT_ROOT
 uv sync
