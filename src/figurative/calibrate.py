@@ -28,6 +28,8 @@ from src.figurative.config import FigurativeConfig
 
 LABEL2ID = {l: i for i, l in enumerate(LABEL_NAMES)}
 
+TEST_SPLIT_FILE = "data/figurative/test_split.parquet"
+
 LABEL_MAP = {
     "literal": "literal", "none": "literal",
     "idiom": "idiom", "proverb": "idiom",
@@ -71,6 +73,15 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
     df["label"] = (df["label"].str.strip().str.lower()
                    .map(lambda x: LABEL_MAP.get(x, "literal")))
     df = df.dropna(subset=["text_cree", "label"])
+
+    if os.path.exists(TEST_SPLIT_FILE):
+        held_out = set(pd.read_parquet(TEST_SPLIT_FILE)["text_cree"])
+        n_before = len(df)
+        df = df[~df["text_cree"].isin(held_out)]
+        print(f"[calibrate] excluded {n_before - len(df)} held-out test sentences")
+    else:
+        print(f"[calibrate] WARNING: {TEST_SPLIT_FILE} not found — training on the "
+              "full annotation pool with no held-out test set excluded")
 
     if config.gold_only:
         df = df[df["footnote_applies"] == True]

@@ -129,8 +129,9 @@ ALPHA_SWEEP = [
 
 CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
 IDIOMS_FILE = "data/idioms.txt"
-ANNOT_FILE  = "data/figurative/annotations.parquet"
-TEACHER_ID  = "KonradBRG/deberta-v3-base-figurative"
+ANNOT_FILE      = "data/figurative/annotations.parquet"
+TEST_SPLIT_FILE = "data/figurative/test_split.parquet"
+TEACHER_ID      = "KonradBRG/deberta-v3-base-figurative"
 
 
 # ── Task: checkpoints ─────────────────────────────────────────────────────────
@@ -459,6 +460,11 @@ def task_validation() -> None:
 
         return rows
 
+    if not os.path.exists(TEST_SPLIT_FILE):
+        sys.exit(f"{TEST_SPLIT_FILE} not found — run scripts/data/build_test_split.py "
+                 "once first, so this task evaluates on sentences no calibration run "
+                 "has trained on.")
+
     annot = pd.read_parquet(ANNOT_FILE)
     annot = annot.dropna(subset=["text_cree", "label"])
     # normalise label column (in case of stray whitespace)
@@ -466,9 +472,12 @@ def task_validation() -> None:
         lambda x: x if x in LABEL_NAMES else "literal"
     )
 
+    held_out = set(pd.read_parquet(TEST_SPLIT_FILE)["text_cree"])
+    annot = annot[annot["text_cree"].isin(held_out)]
+
     gold = annot[annot["footnote_applies"] == True]
 
-    print(f"Full validation set : {len(annot)} sentences")
+    print(f"Full validation set (held-out only) : {len(annot)} sentences")
     print(f"  label dist: {annot['label'].value_counts().to_dict()}")
     print(f"Gold subset (footnote_applies=True): {len(gold)} sentences")
     print(f"  label dist: {gold['label'].value_counts().to_dict()}")
