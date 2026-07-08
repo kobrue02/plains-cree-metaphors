@@ -59,8 +59,12 @@ ALPHA_SWEEP = [
     (0.0,  "Ablation: full"),
     (0.05, "Contrastive α=0.05"),
     (0.1,  "Ablation: TLM+contrastive"),
-    (0.25, "Contrastive α=0.25"),
+    (0.15, "Contrastive α=0.15"),
+    (0.2,  "Contrastive α=0.2"),
+    (0.3,  "Contrastive α=0.3"),
+    (0.4,  "Contrastive α=0.4"),
     (0.5,  "Contrastive α=0.5"),
+    (0.75, "Contrastive α=0.75"),
     (1.0,  "Contrastive α=1.0"),
 ]
 

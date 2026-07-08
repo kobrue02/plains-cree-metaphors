@@ -103,8 +103,12 @@ _VALIDATION_MODELS = [
     # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
     # alpha=0.0 is "Ablation: full" above; alpha=0.1 is "Ablation: TLM+contrastive"
     ("Contrastive α=0.05", "KonradBRG/xlm-mlm-alpha-0p05-plains-cree-en-calibrated"),
-    ("Contrastive α=0.25", "KonradBRG/xlm-mlm-alpha-0p25-plains-cree-en-calibrated"),
+    ("Contrastive α=0.15", "KonradBRG/xlm-mlm-alpha-0p15-plains-cree-en-calibrated"),
+    ("Contrastive α=0.2",  "KonradBRG/xlm-mlm-alpha-0p2-plains-cree-en-calibrated"),
+    ("Contrastive α=0.3",  "KonradBRG/xlm-mlm-alpha-0p3-plains-cree-en-calibrated"),
+    ("Contrastive α=0.4",  "KonradBRG/xlm-mlm-alpha-0p4-plains-cree-en-calibrated"),
     ("Contrastive α=0.5",  "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
+    ("Contrastive α=0.75", "KonradBRG/xlm-mlm-alpha-0p75-plains-cree-en-calibrated"),
     ("Contrastive α=1.0",  "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
 ]
 
@@ -114,8 +118,12 @@ ALPHA_SWEEP = [
     (0.0,  "Ablation: full",            "KonradBRG/xlm-mlm-abl-full-plains-cree-en-calibrated"),
     (0.05, "Contrastive α=0.05",        "KonradBRG/xlm-mlm-alpha-0p05-plains-cree-en-calibrated"),
     (0.1,  "Ablation: TLM+contrastive", "KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-calibrated"),
-    (0.25, "Contrastive α=0.25",        "KonradBRG/xlm-mlm-alpha-0p25-plains-cree-en-calibrated"),
+    (0.15, "Contrastive α=0.15",        "KonradBRG/xlm-mlm-alpha-0p15-plains-cree-en-calibrated"),
+    (0.2,  "Contrastive α=0.2",         "KonradBRG/xlm-mlm-alpha-0p2-plains-cree-en-calibrated"),
+    (0.3,  "Contrastive α=0.3",         "KonradBRG/xlm-mlm-alpha-0p3-plains-cree-en-calibrated"),
+    (0.4,  "Contrastive α=0.4",         "KonradBRG/xlm-mlm-alpha-0p4-plains-cree-en-calibrated"),
     (0.5,  "Contrastive α=0.5",         "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
+    (0.75, "Contrastive α=0.75",        "KonradBRG/xlm-mlm-alpha-0p75-plains-cree-en-calibrated"),
     (1.0,  "Contrastive α=1.0",         "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
 ]
 

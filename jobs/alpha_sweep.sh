@@ -4,10 +4,10 @@
 #
 # alpha=0.0  and alpha=0.1 already exist as the "full" and "tlm_contrastive"
 # ablation conditions (jobs/ablation.sh) — this script only submits the new
-# points needed to fill out the curve: 0.05, 0.25, 0.5, 1.0.
+# points needed to fill out the curve.
 #
 # Each run is a full TLM(contrastive) -> CLKD -> Calibrate pipeline from scratch
-# (~8h, same cost as the tlm_contrastive ablation condition).
+# (~3-4h in practice).
 #
 # Usage (run from project root on the cluster):
 #   bash jobs/alpha_sweep.sh
@@ -31,12 +31,12 @@ run_or_print() {
   fi
 }
 
-for ALPHA in 0.05 0.25 0.5 1.0; do
+for ALPHA in 0.05 0.15 0.2 0.3 0.4 0.5 0.75 1.0; do
   SUFFIX=$(echo "$ALPHA" | tr '.' 'p')   # 0.05 -> 0p05, matches Hub-safe naming
   run_or_print "alpha=${ALPHA} (TLM+InfoNCE -> CLKD -> calibrate)" \
     sbatch \
       --job-name="alpha_${SUFFIX}" \
-      --time=08:00:00 \
+      --time=04:00:00 \
       jobs/pipeline.sh \
         --base-model "$BASE_MODEL" \
         --model-id "${MODEL_ID}-alpha-${SUFFIX}" \
