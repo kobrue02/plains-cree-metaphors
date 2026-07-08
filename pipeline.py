@@ -124,6 +124,11 @@ def main() -> None:
     p.add_argument("--annot-file",       default=ANNOT_FILE)
     p.add_argument("--gold-only",        action="store_true",
                    help="Calibrate on footnote_applies=True sentences only")
+    p.add_argument("--holdout-fold",     type=int, default=None, metavar="K",
+                   help="Exclude cross-validation fold K from calibration training "
+                        "(see scripts/data/build_cv_folds.py). Used for honest CV "
+                        "evaluation, not for the published model — output is kept "
+                        "local and never pushed to the Hub.")
 
     args = p.parse_args()
 
@@ -223,12 +228,16 @@ def main() -> None:
 
     # ── Stage 3: Calibrate ────────────────────────────────────────────────────
     if not args.skip_calibrate:
+        is_cv_run = args.holdout_fold is not None
+        if is_cv_run:
+            cal_local = f"{cal_local}-fold{args.holdout_fold}"
+
         cal_input = args.calibrate_from if args.calibrate_from else clkd_ckpt
         print(f"\n{'='*60}\n  Stage 3 · Calibrate  ({cal_input})\n{'='*60}")
         calibrate(
             checkpoint=cal_input,
             output_dir=cal_local,
-            hub_model_id=cal_hub,
+            hub_model_id=None if is_cv_run else cal_hub,
             annot_file=args.annot_file,
             epochs=args.calibrate_epochs,
             batch_size=min(args.batch_size, 8),
@@ -237,13 +246,15 @@ def main() -> None:
             max_length=min(args.max_length, 128),
             gold_only=args.gold_only,
             wandb_project=args.wandb_project,
+            holdout_fold=args.holdout_fold,
         )
-        publish(
-            cal_hub, "calibrated", args.base_model,
-            student_base=cal_input, literal_ratio=args.literal_ratio,
-            gold_only=args.gold_only, epochs=args.calibrate_epochs,
-            learning_rate=args.calibrate_lr,
-        )
+        if not is_cv_run:
+            publish(
+                cal_hub, "calibrated", args.base_model,
+                student_base=cal_input, literal_ratio=args.literal_ratio,
+                gold_only=args.gold_only, epochs=args.calibrate_epochs,
+                learning_rate=args.calibrate_lr,
+            )
 
     print(f"\n{'='*60}")
     print(f"  Pipeline complete.")

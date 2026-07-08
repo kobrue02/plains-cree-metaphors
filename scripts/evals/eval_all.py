@@ -35,6 +35,26 @@ from src.figurative.predict import load_model, predict_sentences, eval_idioms
 from src.figurative.data import LABEL_NAMES
 
 
+def metrics_for(y_true: list[str], y_pred: list[str]) -> dict:
+    """Per-class and macro P/R/F1 as a flat dict. Shared with eval_cv.py."""
+    from sklearn.metrics import classification_report
+    report = classification_report(
+        y_true, y_pred, labels=LABEL_NAMES, output_dict=True, zero_division=0
+    )
+    row = {}
+    for label in LABEL_NAMES:
+        r = report.get(label, {})
+        row[f"p_{label}"]  = round(r.get("precision", 0.0), 4)
+        row[f"r_{label}"]  = round(r.get("recall",    0.0), 4)
+        row[f"f1_{label}"] = round(r.get("f1-score",  0.0), 4)
+    macro = report.get("macro avg", {})
+    row["macro_p"]  = round(macro.get("precision", 0.0), 4)
+    row["macro_r"]  = round(macro.get("recall",    0.0), 4)
+    row["macro_f1"] = round(macro.get("f1-score",  0.0), 4)
+    row["accuracy"] = round(report.get("accuracy", 0.0), 4)
+    return row
+
+
 # ── Shared model lists ────────────────────────────────────────────────────────
 
 _CHECKPOINTS = [
@@ -129,9 +149,8 @@ ALPHA_SWEEP = [
 
 CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
 IDIOMS_FILE = "data/idioms.txt"
-ANNOT_FILE      = "data/figurative/annotations.parquet"
-TEST_SPLIT_FILE = "data/figurative/test_split.parquet"
-TEACHER_ID      = "KonradBRG/deberta-v3-base-figurative"
+ANNOT_FILE  = "data/figurative/annotations.parquet"
+TEACHER_ID  = "KonradBRG/deberta-v3-base-figurative"
 
 
 # ── Task: checkpoints ─────────────────────────────────────────────────────────
@@ -413,28 +432,8 @@ def task_consistency() -> None:
 
 def task_validation() -> None:
     """Evaluate CLKD models against DeepSeek-annotated validation set."""
-    from sklearn.metrics import classification_report
-
     output_full = "data/figurative/eval_validation_full.csv"
     output_gold = "data/figurative/eval_validation_gold.csv"
-
-    def metrics_for(y_true: list[str], y_pred: list[str]) -> dict:
-        """Per-class and macro P/R/F1 as a flat dict."""
-        report = classification_report(
-            y_true, y_pred, labels=LABEL_NAMES, output_dict=True, zero_division=0
-        )
-        row = {}
-        for label in LABEL_NAMES:
-            r = report.get(label, {})
-            row[f"p_{label}"]  = round(r.get("precision", 0.0), 4)
-            row[f"r_{label}"]  = round(r.get("recall",    0.0), 4)
-            row[f"f1_{label}"] = round(r.get("f1-score",  0.0), 4)
-        macro = report.get("macro avg", {})
-        row["macro_p"]  = round(macro.get("precision", 0.0), 4)
-        row["macro_r"]  = round(macro.get("recall",    0.0), 4)
-        row["macro_f1"] = round(macro.get("f1-score",  0.0), 4)
-        row["accuracy"] = round(report.get("accuracy", 0.0), 4)
-        return row
 
     def evaluate(df: pd.DataFrame, subset_name: str) -> list[dict]:
         cree_texts = df["text_cree"].tolist()
@@ -460,11 +459,9 @@ def task_validation() -> None:
 
         return rows
 
-    if not os.path.exists(TEST_SPLIT_FILE):
-        sys.exit(f"{TEST_SPLIT_FILE} not found — run scripts/data/build_test_split.py "
-                 "once first, so this task evaluates on sentences no calibration run "
-                 "has trained on.")
-
+    # NOTE: these models were calibrated on (subsets of) this same annotation pool,
+    # so this is an in-sample sanity check, not a held-out evaluation — see
+    # scripts/evals/eval_cv.py for the honest cross-validated numbers.
     annot = pd.read_parquet(ANNOT_FILE)
     annot = annot.dropna(subset=["text_cree", "label"])
     # normalise label column (in case of stray whitespace)
@@ -472,12 +469,10 @@ def task_validation() -> None:
         lambda x: x if x in LABEL_NAMES else "literal"
     )
 
-    held_out = set(pd.read_parquet(TEST_SPLIT_FILE)["text_cree"])
-    annot = annot[annot["text_cree"].isin(held_out)]
-
     gold = annot[annot["footnote_applies"] == True]
 
-    print(f"Full validation set (held-out only) : {len(annot)} sentences")
+    print("NOTE: in-sample sanity check, not held-out — see eval_cv.py for CV numbers")
+    print(f"Full validation set : {len(annot)} sentences")
     print(f"  label dist: {annot['label'].value_counts().to_dict()}")
     print(f"Gold subset (footnote_applies=True): {len(gold)} sentences")
     print(f"  label dist: {gold['label'].value_counts().to_dict()}")

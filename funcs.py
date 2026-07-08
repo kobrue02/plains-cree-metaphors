@@ -181,6 +181,7 @@ def calibrate(
     max_length:   int        = 128,
     literal_ratio: int       = 3,
     gold_only:    bool       = False,
+    holdout_fold: int | None = None,
 ) -> str:
     """Calibrate a CLKD model on DeepSeek-annotated Bloomfield sentences."""
     cfg = CalibrateConfig(
@@ -195,6 +196,7 @@ def calibrate(
         max_length=max_length,
         literal_ratio=literal_ratio,
         gold_only=gold_only,
+        holdout_fold=holdout_fold,
     )
     return figurative_calibrate_fn(cfg)
 

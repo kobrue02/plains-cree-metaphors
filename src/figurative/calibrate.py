@@ -28,7 +28,7 @@ from src.figurative.config import FigurativeConfig
 
 LABEL2ID = {l: i for i, l in enumerate(LABEL_NAMES)}
 
-TEST_SPLIT_FILE = "data/figurative/test_split.parquet"
+CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
 
 LABEL_MAP = {
     "literal": "literal", "none": "literal",
@@ -51,6 +51,7 @@ class CalibrateConfig:
     max_length:    int   = 128
     literal_ratio: int   = 3     # literals per figurative sentence
     gold_only:     bool  = False  # restrict to footnote_applies=True rows
+    holdout_fold:  int | None = None  # exclude this cv_folds.parquet fold from training
 
 
 class _WeightedTrainer(Trainer):
@@ -74,14 +75,17 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
                    .map(lambda x: LABEL_MAP.get(x, "literal")))
     df = df.dropna(subset=["text_cree", "label"])
 
-    if os.path.exists(TEST_SPLIT_FILE):
-        held_out = set(pd.read_parquet(TEST_SPLIT_FILE)["text_cree"])
+    if config.holdout_fold is not None:
+        if not os.path.exists(CV_FOLDS_FILE):
+            raise FileNotFoundError(
+                f"{CV_FOLDS_FILE} not found — run scripts/data/build_cv_folds.py first"
+            )
+        folds = pd.read_parquet(CV_FOLDS_FILE).set_index("text_cree")["fold"]
+        held_out = set(folds[folds == config.holdout_fold].index)
         n_before = len(df)
         df = df[~df["text_cree"].isin(held_out)]
-        print(f"[calibrate] excluded {n_before - len(df)} held-out test sentences")
-    else:
-        print(f"[calibrate] WARNING: {TEST_SPLIT_FILE} not found — training on the "
-              "full annotation pool with no held-out test set excluded")
+        print(f"[calibrate] holdout_fold={config.holdout_fold} — "
+              f"excluded {n_before - len(df)} sentences")
 
     if config.gold_only:
         df = df[df["footnote_applies"] == True]
