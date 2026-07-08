@@ -46,6 +46,22 @@ CV_CONDITIONS = [
     ("Ablation: TLM+contrastive", "xlm-mlm-abl-tlm-contrastive"),
     ("XLM-MLM (base pipeline)",   "xlm-mlm"),
     ("XLM-V (base pipeline)",     "xlm-v"),
+    ("Glot500 (base pipeline)",     "glot500"),
+    ("XLM-R (base pipeline)",       "xlm-r"),
+    ("XLM-R-large (base pipeline)", "xlm-r-large"),
+    ("mBERT (base pipeline)",       "mbert"),
+    ("mDeBERTa-v3 (base pipeline)", "mdeberta"),
+    ("mDistilBERT (base pipeline)", "mdistilbert"),
+    # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
+    # alpha=0.0 is "Ablation: full" above; alpha=0.1 is "Ablation: TLM+contrastive"
+    ("Contrastive α=0.05", "xlm-mlm-alpha-0p05"),
+    ("Contrastive α=0.15", "xlm-mlm-alpha-0p15"),
+    ("Contrastive α=0.2",  "xlm-mlm-alpha-0p2"),
+    ("Contrastive α=0.3",  "xlm-mlm-alpha-0p3"),
+    ("Contrastive α=0.4",  "xlm-mlm-alpha-0p4"),
+    ("Contrastive α=0.5",  "xlm-mlm-alpha-0p5"),
+    ("Contrastive α=0.75", "xlm-mlm-alpha-0p75"),
+    ("Contrastive α=1.0",  "xlm-mlm-alpha-1p0"),
 ]
 
 
