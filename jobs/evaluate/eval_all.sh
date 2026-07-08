@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=Eval_All_CLKD
+#SBATCH --job-name=Eval_All
 #SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -11,9 +11,13 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Evaluate all trained figurative classifiers on the Cree idiom golden set.
-# Models are loaded and freed one at a time to avoid OOM.
-# Output: data/figurative/results_table.csv
+# Runs every task in scripts/evals/eval_all.py — checkpoints (idiom golden set),
+# figurative-rate, simile, consistency, and validation — across every baseline,
+# CLKD, and calibrated checkpoint. Models are loaded and freed one at a time to
+# avoid OOM. For just one task, use eval_all.py --task <name> directly, or
+# eval_validation_set.sh for validation alone.
+# Output: data/figurative/{results_table,eval_figurative_rate,eval_simile_detection,
+#         eval_consistency,eval_validation_full,eval_validation_gold}.csv
 
 # 1. Project root (defined first — cache paths below anchor to it, not $WORK,
 #    which is unset in the batch environment on this cluster)
@@ -39,13 +43,13 @@ cd $PROJECT_ROOT
 uv sync
 mkdir -p logs
 
-# 4. Run evaluation
+# 5. Run evaluation
 echo "Starting full evaluation sweep..."
 
 python3 scripts/evals/eval_all.py
 
 if [ $? -eq 0 ]; then
-    echo "Evaluation completed. Results saved to data/figurative/results_table.csv"
+    echo "Evaluation completed. Results saved under data/figurative/"
 else
     echo "Evaluation failed with exit code $?."
     exit 1

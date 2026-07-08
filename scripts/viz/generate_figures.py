@@ -10,6 +10,7 @@ Output:
   figures/ablation_heatmap.tex         — per-class F1 heatmap across ablation conditions (eval_validation_set.sh)
   figures/ablation_macro_f1.tex        — macro-F1 bar chart, ablation conditions grouped by role (eval_validation_set.sh)
   figures/contrastive_impact.tex       — per-class F1, full pipeline vs +contrastive alignment (eval_validation_set.sh)
+  figures/contrastive_alpha_sweep.tex  — macro F1 vs. InfoNCE weight alpha (jobs/alpha_sweep.sh + eval_validation_set.sh)
   figures/compile_figures.tex          — standalone LaTeX wrapper for whichever figures were written
 
 A figure whose source CSV or model rows aren't ready yet is skipped with a
@@ -26,6 +27,7 @@ os.makedirs("figures", exist_ok=True)
 CONS_CSV       = "data/figurative/eval_consistency.csv"
 RATE_CSV       = "data/figurative/eval_figurative_rate.csv"
 VALID_GOLD_CSV = "data/figurative/eval_validation_gold.csv"
+VALID_FULL_CSV = "data/figurative/eval_validation_full.csv"
 
 CLASSES      = ["literal", "idiom", "metaphor", "simile"]
 CLASS_LABELS = ["Literal", "Idiom", "Metaphor", "Simile"]
@@ -48,6 +50,18 @@ ABLATION_CONDITIONS = [
     ("Ablation: full",            "Full pipeline", "VizBlue"),
     ("Ablation: mono-MLM warmup", "+ Mono-MLM",    "VizAqua"),
     ("Ablation: TLM+contrastive", "+ Contrastive", "VizAqua"),
+]
+
+# InfoNCE contrastive-alignment weight sweep (jobs/alpha_sweep.sh) — alpha ->
+# model label in the validation CSVs. alpha=0.0/0.1 reuse the "full"/
+# "TLM+contrastive" ablation checkpoints rather than duplicating a training run.
+ALPHA_SWEEP = [
+    (0.0,  "Ablation: full"),
+    (0.05, "Contrastive α=0.05"),
+    (0.1,  "Ablation: TLM+contrastive"),
+    (0.25, "Contrastive α=0.25"),
+    (0.5,  "Contrastive α=0.5"),
+    (1.0,  "Contrastive α=1.0"),
 ]
 
 written_figures: list[str] = []
@@ -418,6 +432,54 @@ def make_contrastive_impact() -> None:
     emit(f"figures/{name}.tex", content)
 
 
+# ── figure 6: contrastive alpha sweep — macro F1 vs. InfoNCE weight ───────────
+
+def make_alpha_sweep() -> None:
+    name = "contrastive_alpha_sweep"
+    models = [model for _, model in ALPHA_SWEEP]
+
+    gold = load_rows(VALID_GOLD_CSV, models)
+    full = load_rows(VALID_FULL_CSV, models)
+    if gold is None or full is None:
+        missing = VALID_GOLD_CSV if gold is None else VALID_FULL_CSV
+        skip(name, f"{missing} not ready — run jobs/evaluate/eval_validation_set.sh")
+        return
+
+    gold_coords = " ".join(
+        f"({alpha},{float(gold.loc[model, 'macro_f1']):.4f})" for alpha, model in ALPHA_SWEEP
+    )
+    full_coords = " ".join(
+        f"({alpha},{float(full.loc[model, 'macro_f1']):.4f})" for alpha, model in ALPHA_SWEEP
+    )
+    gold_labels = "\n  ".join(
+        rf"\node[font=\scriptsize, above, text=VizBlue] at (axis cs:{alpha},{float(gold.loc[model, 'macro_f1']):.4f}) {{{float(gold.loc[model, 'macro_f1']):.2f}}};"
+        for alpha, model in ALPHA_SWEEP
+    )
+
+    content = COLOR_DEFS + rf"""
+\begin{{tikzpicture}}
+\begin{{axis}}[
+  width=9.5cm, height=6cm,
+  xlabel={{\small InfoNCE weight $\alpha$}},
+  ylabel={{\small Macro F1}},
+  ymin=0, ymax=1,
+  ymajorgrids=true,
+  grid style={{dashed, gray!35}},
+  xticklabel style={{font=\small}},
+  yticklabel style={{font=\small}},
+  legend style={{font=\small, at={{(0.5,1.08)}}, anchor=south, legend columns=2}},
+  legend entries={{Gold subset,Full validation set}},
+  enlarge x limits=0.08,
+]
+\addplot[VizBlue, thick, mark=*, mark size=1.8pt] coordinates {{{gold_coords}}};
+\addplot[VizAqua, thick, mark=*, mark size=1.8pt, dashed] coordinates {{{full_coords}}};
+{gold_labels}
+\end{{axis}}
+\end{{tikzpicture}}
+"""
+    emit(f"figures/{name}.tex", content)
+
+
 # ── run ─────────────────────────────────────────────────────────────────────────
 
 make_consistency_heatmap()
@@ -425,6 +487,7 @@ make_figurative_dist()
 make_ablation_heatmap()
 make_ablation_macro_f1()
 make_contrastive_impact()
+make_alpha_sweep()
 
 
 # ── standalone compile wrapper (only figures that were actually written) ──────
@@ -433,6 +496,7 @@ LAYOUT = [
     ("results_heatmap",         "results_figurative_dist"),
     ("ablation_heatmap",        None),
     ("ablation_macro_f1",       "contrastive_impact"),
+    ("contrastive_alpha_sweep", None),
 ]
 
 rows_tex = []
@@ -463,5 +527,5 @@ with open("figures/compile_figures.tex", "w") as f:
 print("Wrote figures/compile_figures.tex")
 print("  → compile with: cd figures && pdflatex compile_figures.tex")
 
-if len(written_figures) < 5:
-    print(f"\n{5 - len(written_figures)} figure(s) skipped — re-run once the corresponding eval job finishes.")
+if len(written_figures) < 6:
+    print(f"\n{6 - len(written_figures)} figure(s) skipped — re-run once the corresponding eval job finishes.")

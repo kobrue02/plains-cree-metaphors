@@ -100,6 +100,23 @@ _VALIDATION_MODELS = [
     ("Ablation: neither",         "KonradBRG/xlm-mlm-abl-neither-plains-cree-en-calibrated"),
     ("Ablation: mono-MLM warmup", "KonradBRG/xlm-mlm-abl-mono-mlm-plains-cree-en-calibrated"),
     ("Ablation: TLM+contrastive", "KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-calibrated"),
+    # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
+    # alpha=0.0 is "Ablation: full" above; alpha=0.1 is "Ablation: TLM+contrastive"
+    ("Contrastive α=0.05", "KonradBRG/xlm-mlm-alpha-0p05-plains-cree-en-calibrated"),
+    ("Contrastive α=0.25", "KonradBRG/xlm-mlm-alpha-0p25-plains-cree-en-calibrated"),
+    ("Contrastive α=0.5",  "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
+    ("Contrastive α=1.0",  "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
+]
+
+# alpha -> (label in _VALIDATION_MODELS, calibrated repo_id) — used by
+# scripts/viz/generate_figures.py to build the contrastive-alpha line plot.
+ALPHA_SWEEP = [
+    (0.0,  "Ablation: full",            "KonradBRG/xlm-mlm-abl-full-plains-cree-en-calibrated"),
+    (0.05, "Contrastive α=0.05",        "KonradBRG/xlm-mlm-alpha-0p05-plains-cree-en-calibrated"),
+    (0.1,  "Ablation: TLM+contrastive", "KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-calibrated"),
+    (0.25, "Contrastive α=0.25",        "KonradBRG/xlm-mlm-alpha-0p25-plains-cree-en-calibrated"),
+    (0.5,  "Contrastive α=0.5",         "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
+    (1.0,  "Contrastive α=1.0",         "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
 ]
 
 CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
