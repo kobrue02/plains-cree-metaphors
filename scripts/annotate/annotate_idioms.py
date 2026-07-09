@@ -3,8 +3,8 @@ Scan the unlabeled pool for sentences containing known Plains Cree idioms
 and append them to annotations.parquet as gold idiom labels.
 
 Usage:
-  python scripts/annotate_idioms.py [--pool data/figurative/active_pool.parquet]
-  python scripts/annotate_idioms.py --dry-run
+  python scripts/annotate/annotate_idioms.py [--pool data/bloomfield_texts_sentences.parquet]
+  python scripts/annotate/annotate_idioms.py --dry-run
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 IDIOMS_FILE = "data/idioms.txt"
-POOL_FILE   = "data/figurative/active_pool.parquet"
+POOL_FILE   = "data/bloomfield_texts_sentences.parquet"
 ANNOT_FILE  = "data/figurative/annotations.parquet"
 
 
@@ -65,7 +65,7 @@ def main() -> None:
     print(f"Loaded {len(idioms)} idioms\n")
 
     if not os.path.exists(args.pool):
-        sys.exit(f"Pool file not found: {args.pool}\nRun 'scripts/active_loop.py infer' first.")
+        sys.exit(f"Pool file not found: {args.pool}")
 
     pool = pd.read_parquet(args.pool)
 

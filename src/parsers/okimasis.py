@@ -17,8 +17,8 @@ Cree text is identified by SRO macron vowels: ā ē ī ō
 (this book uses macrons; Bloomfield uses circumflexes — both are valid SRO)
 
 Usage:
-  python src/scrapers/scrape_okimasis.py --pdf <path>
-  python src/scrapers/scrape_okimasis.py --pdf <path> --out data/sentences_okimasis.txt
+  python src/parsers/okimasis.py --pdf <path>
+  python src/parsers/okimasis.py --pdf <path> --out data/sentences_okimasis.txt
 """
 
 from __future__ import annotations

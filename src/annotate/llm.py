@@ -21,7 +21,6 @@ def _load_api_key() -> str:
     )
 
 
-API_KEY = _load_api_key()
 MODEL_ID = "mistralai/mistral-medium-3.5-128b"
 
 
@@ -41,7 +40,7 @@ Please return only one word, either "simile", "metaphor", "idiom", "proverb", or
 
 def call_llm(prompt: str) -> tuple[str, str]:
     headers = {
-        "Authorization": f"Bearer {API_KEY}",
+        "Authorization": f"Bearer {_load_api_key()}",
         "Accept": "application/json"
     }
 

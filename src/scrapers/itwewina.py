@@ -5,7 +5,7 @@ Queries https://itwewina.altlab.app/search?q=<word> and parses the HTML
 to extract lemma, part-of-speech, grammatical class, and English definitions.
 
 Usage:
-    from src.scrapers.scrape_itwewina import lookup, lookup_sentence
+    from src.scrapers.itwewina import lookup, lookup_sentence
 
     # Single word
     entries = lookup("nipiy")

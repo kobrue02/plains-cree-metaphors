@@ -13,8 +13,8 @@ modern SRO. The DJVU OCR renders macron-a (â) as 'd' throughout; the text
 is preserved as-is since the model sees character patterns, not orthography.
 
 Usage:
-  python src/scrapers/scrape_bloomfield_1930.py --txt data/P005409_djvu.txt
-  python src/scrapers/scrape_bloomfield_1930.py --txt data/P005409_djvu.txt --stats
+  python src/parsers/bloomfield_1930.py --txt data/P005409_djvu.txt
+  python src/parsers/bloomfield_1930.py --txt data/P005409_djvu.txt --stats
 """
 
 from __future__ import annotations

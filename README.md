@@ -43,7 +43,7 @@ src/
 
 scripts/
   data/           Corpus regeneration
-  annotate/       Active-learning annotation loop
+  annotate/       DeepSeek gold annotation, idiom scanning, DeepSeek-vs-model agreement eval
   train/          Sweep result summarization
   evaluate/       TLM intrinsic evaluation (perplexity, bitext retrieval)
   evals/          Full model evaluation sweep

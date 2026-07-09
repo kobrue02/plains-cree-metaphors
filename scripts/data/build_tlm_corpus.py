@@ -38,7 +38,7 @@ def build_bloomfield_df(skip_scrape: bool = False) -> pd.DataFrame:
     from src.mt.sentence_splitter import ParallelSentenceSplitter
 
     if not skip_scrape:
-        from src.scrapers.scrape_bloomfield import BloomfieldScraper
+        from src.scrapers.bloomfield import BloomfieldScraper
         print("Scraping Bloomfield texts ...")
         BloomfieldScraper().scrape(output=BLOOMFIELD_CSV)
 
@@ -55,7 +55,7 @@ def build_bloomfield_df(skip_scrape: bool = False) -> pd.DataFrame:
 
 def build_edtekla_df() -> pd.DataFrame:
     import tempfile
-    from src.scrapers.scrape_edtekla import EdTeKLAScraper
+    from src.scrapers.edtekla import EdTeKLAScraper
     print("\nScraping EdTeKLA corpus ...")
     # scrape() must write to a file; use a temp path and discard after
     tmp = tempfile.NamedTemporaryFile(suffix=".txt", delete=False)
@@ -71,7 +71,7 @@ def build_edtekla_df() -> pd.DataFrame:
 
 
 def build_ojibwe_df() -> pd.DataFrame:
-    from src.scrapers.scrape_ojibwe import parse, to_parallel_df
+    from src.parsers.ojibwe import parse, to_parallel_df
     print("\nParsing Ojibwe texts ...")
     stories = parse(OJIBWE_TXT)
     df = to_parallel_df(stories)
@@ -112,7 +112,7 @@ def main() -> None:
     # Okimasis
     if not args.skip_okimasis:
         if os.path.exists(OKIMASIS_PDF):
-            from src.scrapers.scrape_okimasis import extract
+            from src.parsers.okimasis import extract
             print("\nExtracting Okimāsis textbook pairs ...")
             pairs_okimasis = extract(OKIMASIS_PDF)
             df_okimasis = pd.DataFrame(pairs_okimasis, columns=["text_cree", "text_en"])
@@ -130,7 +130,7 @@ def main() -> None:
     pairs_1930: list[tuple[str, str]] = []
     if not args.skip_bloomfield_1930:
         if os.path.exists(BLOOMFIELD_1930_TXT):
-            from src.scrapers.scrape_bloomfield_1930 import extract
+            from src.parsers.bloomfield_1930 import extract
             print("\nExtracting Bloomfield (1930) paragraph pairs ...")
             pairs_1930 = extract(BLOOMFIELD_1930_TXT)
             df_1930 = pd.DataFrame(pairs_1930, columns=["text_cree", "text_en"])

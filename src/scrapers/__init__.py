@@ -1,2 +1,2 @@
-from src.scrapers.scrape_bloomfield import BloomfieldScraper
-from src.scrapers.scrape_edtekla import EdTeKLAScraper
+from src.scrapers.bloomfield import BloomfieldScraper
+from src.scrapers.edtekla import EdTeKLAScraper

@@ -100,7 +100,7 @@ def add_to_pool(
     ----------
     src:
         Either a file path to a Cree ||| English text file, or a list of
-        (cree, english) tuples returned directly by scrape_bloomfield_1930.extract().
+        (cree, english) tuples returned directly by bloomfield_1930.extract().
     pool_path:
         Path to the parquet pool file to append to.
     dry_run:
