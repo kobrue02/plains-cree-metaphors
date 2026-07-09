@@ -1,6 +1,6 @@
 """
 Split Bloomfield (1930) paragraph pairs into Cree sentences and append to
-the active annotation pool (data/bloomfield_texts_sentences.csv).
+the active annotation pool (data/bloomfield_texts_sentences.parquet).
 
 The 1930 "Sacred Stories" corpus contains oral narrative — trickster tales and
 sacred stories — which are figurative-language-rich compared to the 1934
@@ -124,7 +124,7 @@ def add_to_pool(
     known = set(pool["text_cree"].dropna().str.strip().tolist())
     print(f"Pool: {len(pool):,} existing sentences")
 
-    gold_file = "data/figurative/annotations.parquet"
+    gold_file = "data/figurative/bloomfield_annotated.parquet"
     if os.path.exists(gold_file):
         gold = pd.read_parquet(gold_file)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())

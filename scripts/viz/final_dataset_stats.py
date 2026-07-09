@@ -2,7 +2,7 @@
 Summary statistics for the final figurative-language annotated dataset
 (gold + silver, deduplicated) for the writeup.
 
-"Gold" = data/figurative/bloomfield_annotated.csv (Bloomfield footnote-driven
+"Gold" = data/figurative/bloomfield_annotated.parquet (Bloomfield footnote-driven
 DeepSeek annotation, scripts/annotate/annotate_bloomfield.py). Includes both
 footnote-verified rows (footnote_applies=True) and same-paragraph rows labeled
 by context only (footnote_applies=False) — this matches what
@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import pandas as pd
 
-GOLD_FILE   = "data/figurative/bloomfield_annotated.csv"
+GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 SILVER_FILE = "data/figurative/deepseek_labels.parquet"
 POOL_FILE   = "data/bloomfield_texts_sentences.parquet"
 
@@ -58,7 +58,7 @@ def _vocab(texts: "pd.Series") -> set[str]:
 def _load_manuscript_lookup() -> pd.Series:
     """The authoritative Cree-sentence -> manuscript (bloomfield_1934/1930) map.
 
-    NOTE: bloomfield_annotated.csv's own 'source_file' column is a story-title
+    NOTE: bloomfield_annotated.parquet's own 'source_file' column is a story-title
     slug (e.g. 'sacred-stories-14-...', 'pct-08-...') from bloomfield_texts.parquet
     — NOT a reliable proxy for which manuscript a sentence is from. Some stories
     *within* Bloomfield's 1934 published Plains Cree Texts are themselves titled
@@ -77,7 +77,7 @@ def load_gold(footnoted_only: bool) -> pd.DataFrame:
     if not os.path.exists(GOLD_FILE):
         print(f"[warn] gold file not found: {GOLD_FILE}")
         return pd.DataFrame(columns=["text_cree", "text_en", "label", "source_file", "manuscript"])
-    df = pd.read_csv(GOLD_FILE)
+    df = pd.read_parquet(GOLD_FILE)
     if footnoted_only:
         df = df[df["footnote_applies"] == True]
     df = df[["text_cree", "text_en", "label", "source_file"]].copy()
@@ -162,7 +162,7 @@ def main() -> None:
     p.add_argument("--gold-footnoted-only", action="store_true",
                    help="Restrict gold to footnote_applies=True (219 rows) instead of "
                         "all footnoted-paragraph sentences (1,225 rows)")
-    p.add_argument("--out", default="data/figurative/final_dataset_stats.csv",
+    p.add_argument("--out", default="data/figurative/final_dataset_stats.parquet",
                    help="Where to save the combined final dataset's per-label/source counts")
     args = p.parse_args()
 
@@ -177,7 +177,7 @@ def main() -> None:
     if not final.empty:
         os.makedirs(os.path.dirname(args.out), exist_ok=True)
         summary = final.groupby(["annotation_type", "label"]).size().reset_index(name="count")
-        summary.to_csv(args.out, index=False)
+        summary.to_parquet(args.out, index=False)
         print(f"\nSaved label/source breakdown → {args.out}")
 
 

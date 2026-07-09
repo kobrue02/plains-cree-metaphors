@@ -32,7 +32,7 @@ WANDB_PROJECT  = "FNLP"
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
 SENTENCES_FILE = "data/sentences.parquet"
 CORPUS_FILE    = "data/bloomfield_texts_sentences.parquet"
-ANNOT_FILE     = "data/figurative/annotations.parquet"
+ANNOT_FILE     = "data/figurative/bloomfield_annotated.parquet"
 
 
 # ── Stage runners ──────────────────────────────────────────────────────────────

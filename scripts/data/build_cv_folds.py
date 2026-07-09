@@ -30,7 +30,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import pandas as pd
 from sklearn.model_selection import StratifiedKFold
 
-ANNOT_FILE    = "data/figurative/annotations.parquet"
+ANNOT_FILE    = "data/figurative/bloomfield_annotated.parquet"
 CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
 LABEL_NAMES   = ["literal", "idiom", "metaphor", "simile"]
 N_FOLDS       = 5

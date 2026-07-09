@@ -11,13 +11,14 @@
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Runs every task in scripts/evals/eval_all.py — checkpoints (idiom golden set),
-# figurative-rate, simile, consistency, and validation — across every baseline,
-# CLKD, and calibrated checkpoint. Models are loaded and freed one at a time to
-# avoid OOM. For just one task, use eval_all.py --task <name> directly, or
-# eval_validation_set.sh for validation alone.
-# Output: data/figurative/{results_table,eval_figurative_rate,eval_simile_detection,
-#         eval_consistency,eval_validation_full,eval_validation_gold}.csv
+# Runs scripts/evals/eval_all.py's validation task (the in-sample sanity
+# check against the DeepSeek-annotated pool — see scripts/evals/eval_cv.py
+# for the honest cross-validated numbers) across every CLKD/calibrated
+# checkpoint. Models are loaded and freed one at a time to avoid OOM.
+# No --task flag anymore — the script no longer accepts one; the idiom
+# golden-set/figurative-rate/simile/consistency tasks it used to also run
+# were removed along with their underlying diagnostics.
+# Output: data/figurative/eval_validation_{full,gold}.parquet
 
 # 1. Project root (defined first — cache paths below anchor to it, not $WORK,
 #    which is unset in the batch environment on this cluster)

@@ -6,8 +6,8 @@ Usage:
 
 Output files
 ------------
-  data/figurative/eval_validation_full.csv — validation task (full set)
-  data/figurative/eval_validation_gold.csv — validation task (gold subset)
+  data/figurative/eval_validation_full.parquet — validation task (full set)
+  data/figurative/eval_validation_gold.parquet — validation task (gold subset)
 """
 
 from __future__ import annotations
@@ -94,15 +94,15 @@ ALPHA_SWEEP = [
     (1.0,  "Contrastive α=1.0",         "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
 ]
 
-ANNOT_FILE = "data/figurative/annotations.parquet"
+ANNOT_FILE = "data/figurative/bloomfield_annotated.parquet"
 
 
 # ── Task: validation ──────────────────────────────────────────────────────────
 
 def task_validation() -> None:
     """Evaluate CLKD/calibrated models against the DeepSeek-annotated validation set."""
-    output_full = "data/figurative/eval_validation_full.csv"
-    output_gold = "data/figurative/eval_validation_gold.csv"
+    output_full = "data/figurative/eval_validation_full.parquet"
+    output_gold = "data/figurative/eval_validation_gold.parquet"
 
     def evaluate(df: pd.DataFrame, subset_name: str) -> list[dict]:
         cree_texts = df["text_cree"].tolist()
@@ -150,12 +150,12 @@ def task_validation() -> None:
 
     print("\n\n── Full validation set ──────────────────────────────────────")
     rows_full = evaluate(annot, "full")
-    pd.DataFrame(rows_full).to_csv(output_full, index=False, encoding="utf-8-sig")
+    pd.DataFrame(rows_full).to_parquet(output_full, index=False)
     print(f"\nSaved → {output_full}")
 
     print("\n\n── Gold subset (footnote_applies=True) ──────────────────────")
     rows_gold = evaluate(gold, "gold")
-    pd.DataFrame(rows_gold).to_csv(output_gold, index=False, encoding="utf-8-sig")
+    pd.DataFrame(rows_gold).to_parquet(output_gold, index=False)
     print(f"\nSaved → {output_gold}")
 
 

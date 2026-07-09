@@ -22,7 +22,7 @@ import pandas as pd
 
 SRC_FILE   = "data/sentences_edtekla.txt"
 POOL_FILE  = "data/bloomfield_texts_sentences.parquet"
-GOLD_FILE  = "data/figurative/bloomfield_annotated.csv"
+GOLD_FILE  = "data/figurative/bloomfield_annotated.parquet"
 SOURCE_ID  = "edtekla"
 
 
@@ -59,7 +59,7 @@ def add_to_pool(
     print(f"Pool: {len(pool):,} existing sentences")
 
     if os.path.exists(GOLD_FILE):
-        gold = pd.read_csv(GOLD_FILE)
+        gold = pd.read_parquet(GOLD_FILE)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())
 
     next_para_id = int(pool["paragraph_id"].max()) + 1 if len(pool) > 0 else 0

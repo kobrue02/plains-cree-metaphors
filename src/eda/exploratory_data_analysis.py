@@ -386,8 +386,8 @@ class EDA:
 
 
 if __name__ == "__main__":
-    base_df = pd.read_csv("data/bloomfield_texts.csv", encoding="utf-8-sig")
-    annotated_df = pd.read_csv("data/bloomfield_texts_annotated.csv", encoding="utf-8-sig")
+    base_df = pd.read_parquet("data/bloomfield_texts.parquet")
+    annotated_df = pd.read_parquet("data/bloomfield_texts_annotated.parquet")
     fig = EDA(base_df).plot_figurative_language(annotated_df)
     fig.savefig("figures/figurative_language_types.png", dpi=300)
     fig.show()

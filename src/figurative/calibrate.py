@@ -41,7 +41,7 @@ LABEL_MAP = {
 @dataclass
 class CalibrateConfig:
     checkpoint:   str            # CLKD model to start from
-    annot_file:   str  = "data/figurative/annotations.parquet"
+    annot_file:   str  = "data/figurative/bloomfield_annotated.parquet"
     output_dir:   str  = "data/calibrated"
     hub_model_id: str | None = None
     wandb_project: str | None = None

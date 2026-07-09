@@ -60,13 +60,13 @@ from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 from scripts.evals.eval_all import metrics_for
 
-GOLD_FILE   = "data/figurative/bloomfield_annotated.csv"
+GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 N_FOLDS     = 5
-OUTPUT_FILE = "data/figurative/figurative_results_table.csv"
+OUTPUT_FILE = "data/figurative/figurative_results_table.parquet"
 
 
 def load_gold(footnoted_only: bool) -> pd.DataFrame:
-    df = pd.read_csv(GOLD_FILE)
+    df = pd.read_parquet(GOLD_FILE)
     if footnoted_only:
         df = df[df["footnote_applies"] == True]
     df = df.dropna(subset=["text_cree", "label"]).copy()
@@ -243,7 +243,7 @@ def main() -> None:
 
     df = pd.DataFrame(rows)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    df.to_csv(args.out, index=False)
+    df.to_parquet(args.out, index=False)
 
     print(f"\n{'='*90}")
     print("| Model | Macro P | Macro R | Macro F1 | Literal | Idiom | Metaphor | Simile |")

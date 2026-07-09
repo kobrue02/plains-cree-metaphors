@@ -41,7 +41,7 @@ DEFAULT_MODELS = [
     ("+TLM+InfoNCE", "data/tlm_xlm-mlm-abl-tlm-contrastive"),
 ]
 
-OUTPUT_FILE = "data/figurative/tlm_eval_table.csv"
+OUTPUT_FILE = "data/figurative/tlm_eval_table.parquet"
 
 
 def _parse_model_arg(spec: str) -> tuple[str, str]:
@@ -107,7 +107,7 @@ def main() -> None:
 
     result_df = pd.DataFrame(rows)
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
-    result_df.to_csv(args.out, index=False)
+    result_df.to_parquet(args.out, index=False)
 
     print(f"\n{'='*70}")
     print("| Model | Cree PPL | English PPL | Cree→EN MRR | EN→Cree MRR |")

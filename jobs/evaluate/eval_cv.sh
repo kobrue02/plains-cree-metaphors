@@ -44,5 +44,5 @@ mkdir -p logs
 echo "=== Cross-validated evaluation ==="
 python3 scripts/evals/eval_cv.py "$@"
 
-echo "Results in data/figurative/eval_cv_full.csv"
-echo "           data/figurative/eval_cv_gold.csv"
+echo "Results in data/figurative/eval_cv_full.parquet"
+echo "           data/figurative/eval_cv_gold.parquet"

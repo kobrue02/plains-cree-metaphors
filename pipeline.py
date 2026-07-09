@@ -41,7 +41,7 @@ from scripts.hub.create_collections import add_model_to_collection
 
 TEACHER        = "KonradBRG/deberta-v3-base-figurative"
 SENTENCES_FILE = "data/sentences.parquet"
-ANNOT_FILE     = "data/figurative/annotations.parquet"
+ANNOT_FILE     = "data/figurative/bloomfield_annotated.parquet"
 
 
 def hub_id(prefix: str, model_id: str, stage: str) -> str:

@@ -2,7 +2,7 @@
 Build the Plains Cree figurative-language dataset and push it to the Hub.
 
 Splits:
-  gold      — data/figurative/annotations.parquet rows where Bloomfield's own
+  gold      — data/figurative/bloomfield_annotated.parquet rows where Bloomfield's own
               footnote commentary applies (footnote_applies == True). DeepSeek
               read the footnote and assigned the label; this is the closest
               thing to a human-verified label this project has.
@@ -33,12 +33,12 @@ import pandas as pd
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
-ANNOT_FILE  = "data/figurative/annotations.parquet"
+ANNOT_FILE  = "data/figurative/bloomfield_annotated.parquet"
 CORPUS_FILE = "data/bloomfield_texts_sentences.parquet"
 REPO_ID     = "KonradBRG/plains-cree-figurative"
 
 GOLD_COLUMNS = [
-    "paragraph_id", "sentence_id", "source", "text_cree", "text_en",
+    "paragraph_id", "sentence_id", "source_file", "text_cree", "text_en",
     "label", "footnote_en", "rationale",
 ]
 SYNTHETIC_COLUMNS = [
@@ -97,7 +97,7 @@ own commentary, not to model inference.
 **Label distribution:**
 {dist(gold)}
 
-**Columns:** `paragraph_id`, `sentence_id`, `source` (source text file), `text_cree`, `text_en`,
+**Columns:** `paragraph_id`, `sentence_id`, `source_file` (source text file), `text_cree`, `text_en`,
 `label`, `footnote_en` (Bloomfield's original footnote), `rationale` (DeepSeek's justification).
 
 ### `synthetic` ({len(synthetic):,} sentences)

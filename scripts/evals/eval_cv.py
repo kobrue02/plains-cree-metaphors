@@ -30,7 +30,7 @@ from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 from scripts.evals.eval_all import metrics_for
 
-ANNOT_FILE    = "data/figurative/annotations.parquet"
+ANNOT_FILE    = "data/figurative/bloomfield_annotated.parquet"
 CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
 N_FOLDS       = 5
 
@@ -144,10 +144,10 @@ def main() -> None:
         rows_gold.append({"model": name, "model_id": model_id, "n": len(gold_result), **m_gold})
 
     os.makedirs("data/figurative", exist_ok=True)
-    pd.DataFrame(rows_full).to_csv("data/figurative/eval_cv_full.csv", index=False, encoding="utf-8-sig")
-    pd.DataFrame(rows_gold).to_csv("data/figurative/eval_cv_gold.csv", index=False, encoding="utf-8-sig")
-    print("\nSaved → data/figurative/eval_cv_full.csv")
-    print("Saved → data/figurative/eval_cv_gold.csv")
+    pd.DataFrame(rows_full).to_parquet("data/figurative/eval_cv_full.parquet", index=False)
+    pd.DataFrame(rows_gold).to_parquet("data/figurative/eval_cv_gold.parquet", index=False)
+    print("\nSaved → data/figurative/eval_cv_full.parquet")
+    print("Saved → data/figurative/eval_cv_gold.parquet")
 
 
 if __name__ == "__main__":

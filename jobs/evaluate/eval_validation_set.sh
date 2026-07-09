@@ -12,8 +12,12 @@
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
 # Evaluate all CLKD models against DeepSeek-annotated validation set.
-# Requires data/figurative/bloomfield_annotated.csv to be present
-# (generated locally by scripts/annotate_bloomfield.py).
+# Requires data/figurative/bloomfield_annotated.parquet to be present
+# (generated locally by scripts/annotate/annotate_bloomfield.py).
+#
+# Identical to jobs/evaluate/eval_all.sh now — eval_all.py no longer accepts
+# a --task flag (it only ever runs the validation task), so this script is
+# kept only as a clearly-named alias. Both call the same function.
 
 # 1. Project root (defined first — cache paths below anchor to it, not $WORK,
 #    which is unset in the batch environment on this cluster)
@@ -41,7 +45,7 @@ mkdir -p logs
 
 # 4. Run evaluation
 echo "=== Validation set evaluation ==="
-python3 scripts/evals/eval_all.py --task validation
+python3 scripts/evals/eval_all.py
 
-echo "Results in data/figurative/eval_validation_full.csv"
-echo "           data/figurative/eval_validation_gold.csv"
+echo "Results in data/figurative/eval_validation_full.parquet"
+echo "           data/figurative/eval_validation_gold.parquet"

@@ -25,7 +25,7 @@ FIGURATIVE_PRESETS = {
 
 
 def scrape() -> pd.DataFrame:
-    """Scrape Bloomfield Plains Cree texts and save to data/bloomfield_texts.csv."""
+    """Scrape Bloomfield Plains Cree texts and save to data/bloomfield_texts.parquet."""
     df = BloomfieldScraper().scrape(output="data/bloomfield_texts.parquet")
     return df
 
@@ -49,7 +49,7 @@ def eda(df: pd.DataFrame | None = None) -> None:
 
 
 def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
-    """Run LLM annotation on the Bloomfield paragraphs and save to data/bloomfield_texts_annotated.csv."""
+    """Run LLM annotation on the Bloomfield paragraphs and save to data/bloomfield_texts_annotated.parquet."""
     from src.annotate import call_deepseek, format_prompt
 
     path = "data/bloomfield_texts_annotated.parquet"
@@ -172,7 +172,7 @@ def calibrate(
     output_dir:   str        = "data/calibrated",
     hub_model_id: str | None = None,
     wandb_project: str | None = None,
-    annot_file:   str        = "data/figurative/annotations.parquet",
+    annot_file:   str        = "data/figurative/bloomfield_annotated.parquet",
     epochs:       int        = 10,
     batch_size:   int        = 8,
     learning_rate: float     = 5e-6,
@@ -202,9 +202,9 @@ def calibrate(
 def predict_figurative(
     checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
     input_file:  str = "data/bloomfield_texts_sentences.parquet",
-    output_file: str = "data/bloomfield_figurative.csv",
+    output_file: str = "data/bloomfield_figurative.parquet",
 ) -> pd.DataFrame:
-    """Run figurative detection on Bloomfield Cree sentences and save results to CSV."""
+    """Run figurative detection on Bloomfield Cree sentences and save results to parquet."""
     sentences_df = pd.read_parquet(input_file)
     print(f"Loaded {len(sentences_df):,} sentences from {input_file}")
 
@@ -221,7 +221,7 @@ def predict_figurative(
     prob_cols = [f"prob_{n}" for n in _fig_labels]
     cols = ["paragraph_id", "sentence_id", "text", "text_en",
             "label", "confidence"] + prob_cols
-    pred_df[cols].to_csv(output_file, index=False, encoding="utf-8-sig")
+    pred_df[cols].to_parquet(output_file, index=False)
 
     counts = pred_df["label"].value_counts()
     print(f"Saved {len(pred_df):,} predictions to {output_file}")

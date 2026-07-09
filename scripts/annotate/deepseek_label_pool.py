@@ -1,12 +1,18 @@
 """
 Label the sentence pool with DeepSeek only (no model involved).
 
-For every Cree sentence in the pool (excluding the 1930 manuscript by default),
-DeepSeek is given the Cree sentence, its English gloss, and itwêwina dictionary
-entries for each content word, and asked to classify it as literal / idiom /
-metaphor / simile — purely from that evidence, with no model prediction passed
-in. The model's reasoning chain (reasoning_content) is kept alongside the label
-in a "reasoning" field, for auditing why a given label was chosen.
+For every Cree sentence in the pool (excluding the 1930 manuscript by default,
+and always excluding sentences that already have a gold, footnote-verified
+label — see scripts/annotate/annotate_bloomfield.py), DeepSeek is given the
+Cree sentence, its English gloss, and itwêwina dictionary entries for each
+content word, and asked to classify it as literal / idiom / metaphor / simile
+— purely from that evidence, with no model prediction passed in. The model's
+reasoning chain (reasoning_content) is kept alongside the label in a
+"reasoning" field, for auditing why a given label was chosen.
+
+Gold and silver are meant to be disjoint (silver = "the un-footnoted majority
+of the corpus" per the writeup) — gold sentences are excluded here so silver
+never re-annotates something that already has a better-grounded label.
 
 Resume-safe: labels (and reasoning) are checkpointed to a JSONL cache as they
 come in, so an interrupted run picks up where it left off.
@@ -32,6 +38,7 @@ from src.scrapers.itwewina import lookup_sentence, format_for_prompt
 
 OUTPUT_FILE = "data/figurative/deepseek_labels.parquet"
 CACHE_JSONL = "data/figurative/deepseek_labels_cache.jsonl"
+GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 
 LABELS = ["literal", "idiom", "metaphor", "simile"]
 
@@ -156,6 +163,9 @@ def main() -> None:
     p.add_argument("--pool",    default=POOL_FILE)
     p.add_argument("--exclude-source", default=EXCLUDE_SOURCE,
                    help="source_file value to exclude (default: bloomfield_1930; pass '' to include everything)")
+    p.add_argument("--gold-file", default=GOLD_FILE,
+                   help="Gold annotations to exclude from silver (default: %(default)s; "
+                        "pass '' to disable this exclusion)")
     p.add_argument("--out",     default=OUTPUT_FILE)
     p.add_argument("--cache",   default=CACHE_JSONL)
     p.add_argument("--limit",   type=int, default=None,
@@ -166,8 +176,19 @@ def main() -> None:
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
-    pool = load_pool(args.pool, exclude_source=args.exclude_source or None, limit=args.limit)
+    pool = load_pool(args.pool, exclude_source=args.exclude_source or None)
     print(f"[pool] {len(pool):,} sentences (excluding source={args.exclude_source!r})")
+
+    if args.gold_file and os.path.exists(args.gold_file):
+        import pandas as pd
+        gold_texts = set(pd.read_parquet(args.gold_file)["text_cree"].dropna().str.strip())
+        before = len(pool)
+        pool = pool[~pool["text_cree"].isin(gold_texts)]
+        print(f"[pool] excluded {before - len(pool):,} sentences already gold-annotated "
+              f"({args.gold_file}) — {len(pool):,} remain")
+
+    if args.limit:
+        pool = pool.head(args.limit)
 
     annotations = annotate_pool(pool, cache_path=args.cache, workers=args.workers)
     pool["deepseek_label"] = pool["text_cree"].map(lambda t: annotations[t]["label"])
