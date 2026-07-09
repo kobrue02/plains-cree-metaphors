@@ -85,7 +85,11 @@ def deberta_teacher() -> FigurativeConfig:
 
 
 def baseline() -> FigurativeConfig:
-    """Vanilla XLM-R base — control condition, no Cree-specific pre-training."""
+    """Vanilla multilingual base encoder — control condition, no Cree-specific
+    pre-training ("no adaptation" row of the results table). Any multilingual
+    encoder works here: override --encoder and --hub-model-id at the CLI
+    (scripts/train/train_figurative_english.py --experiment baseline
+    --encoder <any-hf-id> --hub-model-id KonradBRG/<slug>-figurative)."""
     return FigurativeConfig(
         encoder="xlm-roberta-base",
         experiment_name="baseline_figurative",

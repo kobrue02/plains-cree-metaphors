@@ -5,10 +5,11 @@ For every Cree sentence in the pool (excluding the 1930 manuscript by default),
 DeepSeek is given the Cree sentence, its English gloss, and itwêwina dictionary
 entries for each content word, and asked to classify it as literal / idiom /
 metaphor / simile — purely from that evidence, with no model prediction passed
-in.
+in. The model's reasoning chain (reasoning_content) is kept alongside the label
+in a "reasoning" field, for auditing why a given label was chosen.
 
-Resume-safe: labels are checkpointed to a JSONL cache as they come in, so an
-interrupted run picks up where it left off.
+Resume-safe: labels (and reasoning) are checkpointed to a JSONL cache as they
+come in, so an interrupted run picks up where it left off.
 
 Run this on its own, then scripts/annotate/predict_pool.py on its own, then
 scripts/annotate/agreement_eval.py to compare the two.
@@ -61,38 +62,53 @@ Respond with EXACTLY one word: literal / metaphor / idiom / simile\
 """
 
 
-def _deepseek_label(prompt: str) -> str:
+def _deepseek_annotate(prompt: str) -> tuple[str, str]:
     resp = client.chat.completions.create(
         model=MODEL_ID,
         messages=[
             {"role": "system", "content": _SYSTEM_PROMPT},
             {"role": "user",   "content": prompt},
         ],
-        max_tokens=10,
+        # thinking with reasoning_effort=high can burn several hundred tokens
+        # before emitting the one-word answer — too small a budget here means
+        # the response gets cut off mid-thought with empty content (finish_reason
+        # "length"), which silently looked like "literal" downstream.
+        max_tokens=4096,
         stream=False,
         extra_body={"thinking": {"type": "enabled", "reasoning_effort": "high"}},
     )
-    label = (resp.choices[0].message.content or "").strip().lower()
-    return label if label in LABELS else "literal"
+    choice    = resp.choices[0]
+    label     = (choice.message.content or "").strip().lower()
+    reasoning = (getattr(choice.message, "reasoning_content", None) or "").strip()
+    if label not in LABELS:
+        print(f"  [deepseek] WARNING — invalid/truncated response "
+              f"(finish_reason={choice.finish_reason!r}, content={label!r}); "
+              f"defaulting to 'literal'")
+        label = "literal"
+    return label, reasoning
 
 
-def _annotate_one(text_cree: str, text_en: str) -> tuple[str, str]:
+def _annotate_one(text_cree: str, text_en: str) -> tuple[str, str, str]:
     lookups = lookup_sentence(text_cree, verbose=False)
     prompt  = format_for_prompt(text_cree, text_en, lookups)
-    return text_cree, _deepseek_label(prompt)
+    label, reasoning = _deepseek_annotate(prompt)
+    return text_cree, label, reasoning
 
 
-def load_cache(cache_path: str) -> dict[str, str]:
-    cache: dict[str, str] = {}
+def load_cache(cache_path: str) -> dict[str, dict]:
+    cache: dict[str, dict] = {}
     if os.path.exists(cache_path):
         with open(cache_path, encoding="utf-8") as f:
             for line in f:
                 entry = json.loads(line)
-                cache[entry["text_cree"]] = entry["label"]
+                cache[entry["text_cree"]] = {
+                    "label":     entry["label"],
+                    "reasoning": entry.get("reasoning", ""),
+                }
     return cache
 
 
-def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, str]:
+def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, dict]:
     cache = load_cache(cache_path)
     todo  = pool[~pool["text_cree"].isin(cache.keys())]
     print(f"[deepseek] {len(cache):,} cached  |  {len(todo):,} to annotate  "
@@ -111,13 +127,20 @@ def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, str]:
         for future in as_completed(futures):
             text_cree = futures[future]
             try:
-                _, label = future.result()
+                _, label, reasoning = future.result()
             except Exception as exc:
-                print(f"  [deepseek] error on {text_cree[:40]!r}: {exc}")
-                label = "literal"
+                # A real API/network failure, not a model answer — do NOT cache
+                # a fallback label here, or the resume logic would treat this
+                # sentence as done and never retry it. Just skip; it stays
+                # "to do" and gets picked up on the next run.
+                print(f"  [deepseek] error on {text_cree[:40]!r}: {exc} — will retry next run")
+                done += 1
+                continue
 
-            cache[text_cree] = label
-            cache_f.write(json.dumps({"text_cree": text_cree, "label": label}) + "\n")
+            cache[text_cree] = {"label": label, "reasoning": reasoning}
+            cache_f.write(json.dumps({
+                "text_cree": text_cree, "label": label, "reasoning": reasoning,
+            }) + "\n")
             cache_f.flush()
 
             done += 1
@@ -146,10 +169,12 @@ def main() -> None:
     pool = load_pool(args.pool, exclude_source=args.exclude_source or None, limit=args.limit)
     print(f"[pool] {len(pool):,} sentences (excluding source={args.exclude_source!r})")
 
-    labels = annotate_pool(pool, cache_path=args.cache, workers=args.workers)
-    pool["deepseek_label"] = pool["text_cree"].map(labels)
+    annotations = annotate_pool(pool, cache_path=args.cache, workers=args.workers)
+    pool["deepseek_label"] = pool["text_cree"].map(lambda t: annotations[t]["label"])
+    pool["reasoning"]      = pool["text_cree"].map(lambda t: annotations[t]["reasoning"])
 
-    out_cols = ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label"]
+    out_cols = ["paragraph_id", "sentence_id", "text_cree", "text_en",
+                "deepseek_label", "reasoning"]
     pool[[c for c in out_cols if c in pool.columns]].to_parquet(args.out, index=False)
 
     print(f"\nLabel distribution:")

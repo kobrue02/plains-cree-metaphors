@@ -112,9 +112,8 @@ python tune.py --stage calibrate --show-best --sweep-id <sweep_id>
 ### Evaluation
 
 ```bash
-sbatch jobs/tlm_eval.sh                                        # TLM intrinsic eval (perplexity, bitext retrieval)
-python scripts/evals/eval_all.py                                # full model comparison sweep
-python -c "from funcs import figurative_eval_idioms as f; f()"  # idiom golden-set eval
+sbatch jobs/tlm_eval.sh          # TLM intrinsic eval (perplexity, bitext retrieval)
+python scripts/evals/eval_all.py # in-sample validation-set check (see eval_cv.py for the honest CV numbers)
 ```
 
 Figures and tables for the writeup are regenerated with `python scripts/viz/generate_figures.py`

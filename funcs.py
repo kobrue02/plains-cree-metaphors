@@ -13,8 +13,6 @@ from src.figurative.calibrate import calibrate as figurative_calibrate_fn, Calib
 from src.figurative.predict import (
     load_model as figurative_load_model,
     predict_sentences,
-    predict_idioms,
-    eval_idioms,
 )
 
 FIGURATIVE_PRESETS = {
@@ -201,25 +199,10 @@ def calibrate(
     return figurative_calibrate_fn(cfg)
 
 
-def figurative_eval_idioms(
-    checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
-    idioms_file: str = "data/idioms.txt",
-) -> None:
-    """Evaluate a figurative model on the Cree idiom golden test set and save results to CSV."""
-    slug = checkpoint.replace("/", "_").replace("\\", "_")
-    output_file = f"data/figurative/idiom_eval_{slug}.csv"
-    os.makedirs("data/figurative", exist_ok=True)
-    model, tokenizer = figurative_load_model(checkpoint)
-    result = eval_idioms(idioms_file, model, tokenizer)
-    result["detail"].to_csv(output_file, index=False, encoding="utf-8-sig")
-    print(f"Saved idiom evaluation to {output_file}")
-
-
 def predict_figurative(
     checkpoint:  str = "KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
     input_file:  str = "data/bloomfield_texts_sentences.parquet",
     output_file: str = "data/bloomfield_figurative.csv",
-    idioms_file: str = "data/idioms.txt",
 ) -> pd.DataFrame:
     """Run figurative detection on Bloomfield Cree sentences and save results to CSV."""
     sentences_df = pd.read_parquet(input_file)
@@ -245,14 +228,6 @@ def predict_figurative(
     print(f"  literal={counts.get('literal',0):,}  "
           f"idiom={counts.get('idiom',0):,}  "
           f"metaphor={counts.get('metaphor',0):,}")
-
-    if os.path.exists(idioms_file):
-        print(f"\nEvaluating idiom transfer on {idioms_file} ...")
-        idiom_df = predict_idioms(idioms_file, model, tokenizer)
-        print(idiom_df.to_string(index=False))
-        idiom_out = output_file.replace(".csv", "_idioms.csv")
-        idiom_df.to_csv(idiom_out, index=False, encoding="utf-8-sig")
-        print(f"Saved idiom comparison to {idiom_out}")
 
     return pred_df
 
