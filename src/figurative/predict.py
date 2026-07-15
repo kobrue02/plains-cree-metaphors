@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import torch
 import pandas as pd
+from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
+from src.device import get_device
 from src.figurative.data import LABEL_NAMES, resolve_use_fast
 
 
@@ -19,8 +21,7 @@ def load_model(
         checkpoint, torch_dtype=torch.float32,
     )
     model.eval()
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
+    model.to(get_device())
     return model, tokenizer
 
 
@@ -35,7 +36,8 @@ def predict_sentences(
     device = next(model.parameters()).device
     results = []
 
-    for i in range(0, len(texts), batch_size):
+    batch_starts = range(0, len(texts), batch_size)
+    for i in tqdm(batch_starts, desc="predicting", unit="batch"):
         batch_texts = texts[i : i + batch_size]
         enc = tokenizer(
             batch_texts,

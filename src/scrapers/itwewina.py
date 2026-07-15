@@ -103,6 +103,20 @@ def _tokenise(sentence: str) -> list[str]:
     return [t.lower() for t in tokens if len(t) >= 3 and not _SKIP.match(t)]
 
 
+def _normalize(s: str) -> str:
+    """Strip vowel-length diacritics (â/ê/î/ô) for lenient matching. Bloomfield-era/
+    OCR'd Cree text is inconsistent about marking vowel length; itwêwina's own
+    search normalizes this, but our post-filter previously compared raw strings,
+    silently dropping real dictionary entries whenever the source token's
+    diacritics didn't exactly match the site's citation form (e.g. querying
+    "asê-takosinomakaniyiw" filtered out the site's actual lemma
+    "asê-takosinômakaniyiw" over a single macron)."""
+    import unicodedata
+    return "".join(
+        c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
+    ).lower()
+
+
 def lookup_sentence(
     sentence: str,
     delay: float = 0.3,
@@ -114,9 +128,10 @@ def lookup_sentence(
     for tok in tokens:
         if verbose:
             print(f"  looking up: {tok}")
+        tok_norm = _normalize(tok)
         entries = [
             e for e in lookup(tok, delay=delay)
-            if e["lemma"].lower() == tok or e["lemma"].lower().startswith(tok)
+            if _normalize(e["lemma"]) == tok_norm or _normalize(e["lemma"]).startswith(tok_norm)
         ]
         if entries:
             results[tok] = entries

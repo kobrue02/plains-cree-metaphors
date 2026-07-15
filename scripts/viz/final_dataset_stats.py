@@ -4,9 +4,10 @@ Summary statistics for the final figurative-language annotated dataset
 
 "Gold" = data/figurative/bloomfield_annotated.parquet (Bloomfield footnote-driven
 DeepSeek annotation, scripts/annotate/annotate_bloomfield.py). Includes both
-footnote-verified rows (footnote_applies=True) and same-paragraph rows labeled
-by context only (footnote_applies=False) — this matches what
-src/figurative/calibrate.py actually trains on by default (gold_only=False).
+footnote-verified rows (footnote_applies=True, n=219 — the fixed held-out test
+set src/figurative/calibrate.py always evaluates against and never trains on)
+and same-paragraph rows labeled by context only (footnote_applies=False,
+which calibrate.py does train on).
 
 "Silver" = data/figurative/deepseek_labels.parquet (dictionary-grounded
 DeepSeek annotation over the un-footnoted majority of the corpus,

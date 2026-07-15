@@ -173,18 +173,21 @@ def calibrate(
     hub_model_id: str | None = None,
     wandb_project: str | None = None,
     annot_file:   str        = "data/figurative/bloomfield_annotated.parquet",
+    label_col:    str        = "label",
+    eval_file:    str | None = None,
     epochs:       int        = 10,
     batch_size:   int        = 8,
     learning_rate: float     = 5e-6,
     max_length:   int        = 128,
     literal_ratio: int       = 3,
-    gold_only:    bool       = False,
     holdout_fold: int | None = None,
 ) -> str:
     """Calibrate a CLKD model on DeepSeek-annotated Bloomfield sentences."""
     cfg = CalibrateConfig(
         checkpoint=checkpoint,
         annot_file=annot_file,
+        label_col=label_col,
+        eval_file=eval_file,
         output_dir=output_dir,
         hub_model_id=hub_model_id,
         wandb_project=wandb_project,
@@ -193,7 +196,6 @@ def calibrate(
         learning_rate=learning_rate,
         max_length=max_length,
         literal_ratio=literal_ratio,
-        gold_only=gold_only,
         holdout_fold=holdout_fold,
     )
     return figurative_calibrate_fn(cfg)

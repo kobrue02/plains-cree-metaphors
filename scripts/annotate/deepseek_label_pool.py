@@ -34,71 +34,65 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from scripts.annotate._pool_utils import load_pool, POOL_FILE, EXCLUDE_SOURCE
 from src.annotate.deepseek import client, MODEL_ID
+from src.annotate.figurative_prompt import LABELS, SYSTEM_PROMPT, parse_label
 from src.scrapers.itwewina import lookup_sentence, format_for_prompt
 
 OUTPUT_FILE = "data/figurative/deepseek_labels.parquet"
 CACHE_JSONL = "data/figurative/deepseek_labels_cache.jsonl"
 GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 
-LABELS = ["literal", "idiom", "metaphor", "simile"]
 
-_SYSTEM_PROMPT = """\
-You are annotating Plains Cree sentences for figurative language, using each \
-sentence's English gloss and word-level dictionary glosses as evidence.
+def _deepseek_annotate(prompt: str, retries: int = 3) -> tuple[str, str]:
+    # thinking with reasoning_effort=high can burn several thousand tokens
+    # before emitting the one-word answer, scaling with sentence length (the
+    # per-word walkthrough means longer sentences need more) — too small a
+    # budget here means the response gets cut off mid-thought with empty
+    # content (finish_reason "length"). max_tokens=8192 has been sufficient in
+    # practice for the original SYSTEM_PROMPT (the current production silver
+    # cache has zero empty-response entries), but is not guaranteed to stay
+    # sufficient if the prompt grows — if this starts firing, raise it the
+    # same way src/annotate/llm.py's call_llm default was raised to 16384.
+    for attempt in range(retries + 1):
+        resp = client.chat.completions.create(
+            model=MODEL_ID,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user",   "content": prompt},
+            ],
+            max_tokens=8192,
+            stream=False,
+            extra_body={"thinking": {"type": "enabled", "reasoning_effort": "high"}},
+        )
+        choice    = resp.choices[0]
+        content   = (choice.message.content or "").strip()
+        reasoning = (getattr(choice.message, "reasoning_content", None) or "").strip()
 
-Critical context:
-- The English gloss is a MEANING-FOR-MEANING translation, not word-for-word. \
-It already conveys the intended sense, so a gloss that reads literally in \
-English does NOT mean the Cree original is literal.
-- Figurative language must be identified in the CREE STRUCTURE: compare the \
-word-level Cree meanings (dictionary entries) against the whole-sentence \
-English gloss. If the individual Cree words literally mean one thing but the \
-sentence as a whole means something else, figurative language is present.
-- idiom    — a fixed expression whose overall meaning cannot be composed from \
-the meanings of its individual words.
-- metaphor — an implicit, non-literal predication or conceptual transfer (e.g. \
-a body-part or concrete term used to describe landscape, emotion, or an \
-abstract state) where the word-level meanings do not match the sentence's \
-real meaning.
-- simile   — an explicit comparison, typically marked with tâpiskôc \
-("like"/"as if").
-- literal  — the word-level meanings and the sentence's real meaning match; \
-no figurative device is present.
-
-Respond with EXACTLY one word: literal / metaphor / idiom / simile\
-"""
-
-
-def _deepseek_annotate(prompt: str) -> tuple[str, str]:
-    resp = client.chat.completions.create(
-        model=MODEL_ID,
-        messages=[
-            {"role": "system", "content": _SYSTEM_PROMPT},
-            {"role": "user",   "content": prompt},
-        ],
-        # thinking with reasoning_effort=high can burn several hundred tokens
-        # before emitting the one-word answer — too small a budget here means
-        # the response gets cut off mid-thought with empty content (finish_reason
-        # "length"), which silently looked like "literal" downstream.
-        max_tokens=4096,
-        stream=False,
-        extra_body={"thinking": {"type": "enabled", "reasoning_effort": "high"}},
-    )
-    choice    = resp.choices[0]
-    label     = (choice.message.content or "").strip().lower()
-    reasoning = (getattr(choice.message, "reasoning_content", None) or "").strip()
-    if label not in LABELS:
-        print(f"  [deepseek] WARNING — invalid/truncated response "
-              f"(finish_reason={choice.finish_reason!r}, content={label!r}); "
-              f"defaulting to 'literal'")
-        label = "literal"
-    return label, reasoning
+        label = parse_label(content)
+        if label is not None:
+            # keep the structured EXPRESSION/MEANING lines alongside the reasoning
+            # chain for auditing — e.g. checking whether a metaphor/idiom call
+            # actually named something concrete, per the "must name a specific
+            # expression" constraint above.
+            full_reasoning = f"{reasoning}\n\n--- final answer ---\n{content}".strip()
+            return label, full_reasoning
+        print(f"  [deepseek] empty/unparseable response on attempt {attempt + 1}/{retries + 1} "
+              f"(finish_reason={choice.finish_reason!r}, content={content[:80]!r})"
+              + ("; retrying" if attempt < retries else "; giving up"))
+    # Do NOT default to "literal" here — that would get written into the cache
+    # as if it were a genuine result, permanently defeating annotate_pool()'s
+    # resume-safe retry (a sentence the cache thinks is "done" never gets
+    # revisited). Raising lets the caller's existing "don't cache, retry next
+    # run" exception handling take over instead.
+    raise RuntimeError(f"deepseek: empty/unparseable response after {retries + 1} attempts")
 
 
-def _annotate_one(text_cree: str, text_en: str) -> tuple[str, str, str]:
+def _annotate_one(text_cree: str, text_en: str, annotate_fn=_deepseek_annotate) -> tuple[str, str, str]:
+    """annotate_fn: (prompt: str) -> (label, reasoning). Defaults to DeepSeek;
+    pass a different provider's callable (see src/annotate/llm.py) to reuse
+    this same pool-annotation machinery for another model."""
     lookups = lookup_sentence(text_cree, verbose=False)
     prompt  = format_for_prompt(text_cree, text_en, lookups)
-    label, reasoning = _deepseek_annotate(prompt)
+    label, reasoning = annotate_fn(prompt)
     return text_cree, label, reasoning
 
 
@@ -115,10 +109,13 @@ def load_cache(cache_path: str) -> dict[str, dict]:
     return cache
 
 
-def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, dict]:
+def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_annotate) -> dict[str, dict]:
+    """annotate_fn: (prompt: str) -> (label, reasoning), forwarded to _annotate_one
+    for every sentence — swap it to reuse this pool-annotation loop for another
+    provider/model (see src/annotate/llm.py)."""
     cache = load_cache(cache_path)
     todo  = pool[~pool["text_cree"].isin(cache.keys())]
-    print(f"[deepseek] {len(cache):,} cached  |  {len(todo):,} to annotate  "
+    print(f"[annotate] {len(cache):,} cached  |  {len(todo):,} to annotate  "
           f"(workers={workers})")
 
     if todo.empty:
@@ -128,7 +125,7 @@ def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, dict]:
     with open(cache_path, "a", encoding="utf-8") as cache_f, \
          ThreadPoolExecutor(max_workers=workers) as pool_exec:
         futures = {
-            pool_exec.submit(_annotate_one, row["text_cree"], row["text_en"]): row["text_cree"]
+            pool_exec.submit(_annotate_one, row["text_cree"], row["text_en"], annotate_fn): row["text_cree"]
             for _, row in todo.iterrows()
         }
         for future in as_completed(futures):
@@ -140,7 +137,7 @@ def annotate_pool(pool, cache_path: str, workers: int) -> dict[str, dict]:
                 # a fallback label here, or the resume logic would treat this
                 # sentence as done and never retry it. Just skip; it stays
                 # "to do" and gets picked up on the next run.
-                print(f"  [deepseek] error on {text_cree[:40]!r}: {exc} — will retry next run")
+                print(f"  [annotate] error on {text_cree[:40]!r}: {exc} — will retry next run")
                 done += 1
                 continue
 
@@ -172,7 +169,22 @@ def main() -> None:
                    help="Cap the number of sentences (for a smoke test)")
     p.add_argument("--workers", type=int, default=8,
                    help="Concurrent DeepSeek requests (default: 8)")
+    p.add_argument("--nvidia-model", default=None, metavar="MODEL_ID",
+                   help="Run this NVIDIA-hosted model instead of DeepSeek "
+                        "(e.g. qwen/qwen3.5-122b-a10b) — see src/annotate/llm.py")
+    p.add_argument("--no-reasoning", action="store_true",
+                   help="Don't send reasoning_effort — needed for plain instruct "
+                        "models that don't support it (e.g. meta/llama-3.3-70b-instruct)")
     args = p.parse_args()
+
+    annotate_kwargs = {}
+    if args.nvidia_model:
+        from src.annotate.llm import make_annotate_fn
+        slug = args.nvidia_model.replace("/", "_").replace(":", "_")
+        args.out   = args.out   if args.out   != OUTPUT_FILE  else OUTPUT_FILE.replace(".parquet", f"_{slug}.parquet")
+        args.cache = args.cache if args.cache != CACHE_JSONL else CACHE_JSONL.replace(".jsonl", f"_{slug}.jsonl")
+        annotate_kwargs["annotate_fn"] = make_annotate_fn(args.nvidia_model, reasoning=not args.no_reasoning)
+        print(f"[model] {args.nvidia_model}  (out={args.out}, cache={args.cache})")
 
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
 
@@ -190,7 +202,7 @@ def main() -> None:
     if args.limit:
         pool = pool.head(args.limit)
 
-    annotations = annotate_pool(pool, cache_path=args.cache, workers=args.workers)
+    annotations = annotate_pool(pool, cache_path=args.cache, workers=args.workers, **annotate_kwargs)
     pool["deepseek_label"] = pool["text_cree"].map(lambda t: annotations[t]["label"])
     pool["reasoning"]      = pool["text_cree"].map(lambda t: annotations[t]["reasoning"])
 

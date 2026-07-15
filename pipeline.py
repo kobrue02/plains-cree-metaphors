@@ -121,9 +121,18 @@ def main() -> None:
     p.add_argument("--calibrate-lr",     type=float, default=5e-6)
     p.add_argument("--literal-ratio",    type=int,   default=3,
                    help="Literals per figurative sentence in calibration data (default: 3)")
-    p.add_argument("--annot-file",       default=ANNOT_FILE)
-    p.add_argument("--gold-only",        action="store_true",
-                   help="Calibrate on footnote_applies=True sentences only")
+    p.add_argument("--annot-file",       default=ANNOT_FILE,
+                   help="Training data (default: gold Bloomfield annotations). "
+                        "Point at data/figurative/deepseek_labels.parquet with "
+                        "--label-col deepseek_label to train on silver instead — "
+                        "the 219 footnote-verified gold sentences are always "
+                        "excluded from training and are always the eval target, "
+                        "regardless of this flag.")
+    p.add_argument("--label-col",        default="label",
+                   help="Column in --annot-file holding the label string "
+                        "(e.g. 'deepseek_label' when training on the silver pool)")
+    p.add_argument("--eval-file",        default=None, metavar="PATH",
+                   help="Override the fixed 219-sentence gold eval set (rare — a smoke test, say)")
     p.add_argument("--holdout-fold",     type=int, default=None, metavar="K",
                    help="Exclude cross-validation fold K from calibration training "
                         "(see scripts/data/build_cv_folds.py). Used for honest CV "
@@ -239,12 +248,13 @@ def main() -> None:
             output_dir=cal_local,
             hub_model_id=None if is_cv_run else cal_hub,
             annot_file=args.annot_file,
+            label_col=args.label_col,
+            eval_file=args.eval_file,
             epochs=args.calibrate_epochs,
             batch_size=min(args.batch_size, 8),
             learning_rate=args.calibrate_lr,
             literal_ratio=args.literal_ratio,
             max_length=min(args.max_length, 128),
-            gold_only=args.gold_only,
             wandb_project=args.wandb_project,
             holdout_fold=args.holdout_fold,
         )
@@ -252,7 +262,7 @@ def main() -> None:
             publish(
                 cal_hub, "calibrated", args.base_model,
                 student_base=cal_input, literal_ratio=args.literal_ratio,
-                gold_only=args.gold_only, epochs=args.calibrate_epochs,
+                epochs=args.calibrate_epochs,
                 learning_rate=args.calibrate_lr,
             )
 

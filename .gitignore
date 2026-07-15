@@ -16,3 +16,8 @@ wheels/
 *.csv
 *.png
 *.tex
+*.parquet
+*.jsonl
+*.md
+
+wandb/

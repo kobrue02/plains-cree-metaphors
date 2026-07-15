@@ -18,6 +18,7 @@ import argparse, os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 import pandas as pd
+from sklearn.metrics import cohen_kappa_score
 
 DEEPSEEK_FILE = "data/figurative/deepseek_labels.parquet"
 MODEL_FILE    = "data/figurative/model_predictions.parquet"
@@ -56,8 +57,14 @@ def main() -> None:
     merged.to_parquet(args.out, index=False)
 
     overall = merged["agree"].mean()
+    # Raw agreement is misleadingly inflated by the literal-heavy class skew
+    # (both sources tend to agree just by both saying "literal" often) — Cohen's
+    # kappa corrects for that chance agreement, and is the number worth leading
+    # with in the paper.
+    kappa = cohen_kappa_score(merged["deepseek_label"], merged["model_label"], labels=LABELS)
     print(f"\n{'='*60}")
     print(f"Overall agreement: {overall:.1%}  ({merged['agree'].sum():,}/{len(merged):,})")
+    print(f"Cohen's kappa    : {kappa:.3f}")
     print(f"{'='*60}")
 
     print("\nDeepSeek label distribution:")
@@ -73,6 +80,22 @@ def main() -> None:
 
     print("\nConfusion (rows=DeepSeek, cols=model):")
     print(pd.crosstab(merged["deepseek_label"], merged["model_label"]).to_string())
+
+    # Small dedicated summary — exactly the numbers the paper's agreement
+    # table needs, so filling it in later is a lookup, not a re-derivation.
+    summary_rows = [{"scope": "overall", "n": len(merged),
+                      "agreement": round(overall, 4), "kappa": round(kappa, 4)}]
+    for label in LABELS:
+        subset = merged[merged["deepseek_label"] == label]
+        summary_rows.append({
+            "scope": label,
+            "n": len(subset),
+            "agreement": round(subset["agree"].mean(), 4) if len(subset) else None,
+            "kappa": None,
+        })
+    summary_path = args.out.replace(".parquet", "_summary.parquet")
+    pd.DataFrame(summary_rows).to_parquet(summary_path, index=False)
+    print(f"Saved summary → {summary_path}")
 
     print(f"\nSaved → {args.out}")
 

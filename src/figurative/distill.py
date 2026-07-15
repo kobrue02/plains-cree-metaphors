@@ -38,6 +38,7 @@ from transformers import (
     get_linear_schedule_with_warmup,
 )
 
+from src.device import get_device
 from src.figurative.data import resolve_use_fast
 
 try:
@@ -210,7 +211,7 @@ def _distill_clkd(config: DistillConfig) -> str:
     if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
 
     print(f"[distill] loading teacher : {config.teacher_checkpoint}")
     teacher_tokenizer = AutoTokenizer.from_pretrained(
@@ -375,7 +376,7 @@ def _distill_self(config: DistillConfig) -> str:
     if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
 
     tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
     model = AutoModelForSequenceClassification.from_pretrained(

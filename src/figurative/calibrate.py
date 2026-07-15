@@ -22,6 +22,7 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
+from src.device import get_trainer_device_kwargs
 from src.figurative.data import FigurativeDataset, class_weights_from, resolve_use_fast, LABEL_NAMES, NUM_LABELS
 from src.figurative.evaluate import compute_metrics
 from src.figurative.config import FigurativeConfig
@@ -29,6 +30,7 @@ from src.figurative.config import FigurativeConfig
 LABEL2ID = {l: i for i, l in enumerate(LABEL_NAMES)}
 
 CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
+GOLD_FILE     = "data/figurative/bloomfield_annotated.parquet"
 
 LABEL_MAP = {
     "literal": "literal", "none": "literal",
@@ -40,8 +42,25 @@ LABEL_MAP = {
 
 @dataclass
 class CalibrateConfig:
+    """
+    Held-out policy: outside CV mode (holdout_fold=None), the 219
+    footnote-verified sentences in GOLD_FILE are the fixed evaluation set for
+    every run, regardless of what annot_file trains on (gold, silver, or
+    anything else) — they are always excluded from training and are the only
+    thing calibrate() reports eval metrics against. eval_file lets you point
+    at a different file for eval instead (rare — e.g. a smoke test); it does
+    NOT change what gets excluded from training, which is always GOLD_FILE's
+    footnoted sentences.
+
+    In CV mode (holdout_fold set) this doesn't apply: that's a separate,
+    already-honest k-fold rotation (see scripts/data/build_cv_folds.py /
+    scripts/evals/eval_cv.py) where every sentence is trained on in 4/5 folds
+    and scored only in the fold where it's held out.
+    """
     checkpoint:   str            # CLKD model to start from
     annot_file:   str  = "data/figurative/bloomfield_annotated.parquet"
+    label_col:    str  = "label"  # column in annot_file holding the label string
+    eval_file:    str | None = None  # override the fixed gold test set (rare)
     output_dir:   str  = "data/calibrated"
     hub_model_id: str | None = None
     wandb_project: str | None = None
@@ -50,7 +69,6 @@ class CalibrateConfig:
     learning_rate: float = 5e-6
     max_length:    int   = 128
     literal_ratio: int   = 3     # literals per figurative sentence
-    gold_only:     bool  = False  # restrict to footnote_applies=True rows
     holdout_fold:  int | None = None  # exclude this cv_folds.parquet fold from training
 
 
@@ -69,11 +87,29 @@ class _WeightedTrainer(Trainer):
         return (loss, outputs) if return_outputs else loss
 
 
-def _load_records(config: CalibrateConfig) -> list[dict]:
-    df = pd.read_parquet(config.annot_file)
-    df["label"] = (df["label"].str.strip().str.lower()
+def _read_labeled(path: str, label_col: str) -> pd.DataFrame:
+    df = pd.read_parquet(path)
+    df["label"] = (df[label_col].str.strip().str.lower()
                    .map(lambda x: LABEL_MAP.get(x, "literal")))
-    df = df.dropna(subset=["text_cree", "label"])
+    return df.dropna(subset=["text_cree", "label"])
+
+
+def _to_records(df: pd.DataFrame) -> list[dict]:
+    return [
+        {"text": row["text_cree"], "label": LABEL2ID.get(row["label"], 0)}
+        for _, row in df.iterrows()
+    ]
+
+
+def _load_gold_test_set() -> pd.DataFrame:
+    """The fixed, footnote-verified held-out test set (n=219). Never used for
+    training outside CV mode — this is what every non-CV run is scored against."""
+    df = _read_labeled(GOLD_FILE, "label")
+    return df[df["footnote_applies"] == True]
+
+
+def _load_records(config: CalibrateConfig) -> list[dict]:
+    df = _read_labeled(config.annot_file, config.label_col)
 
     if config.holdout_fold is not None:
         if not os.path.exists(CV_FOLDS_FILE):
@@ -86,9 +122,14 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
         df = df[~df["text_cree"].isin(held_out)]
         print(f"[calibrate] holdout_fold={config.holdout_fold} — "
               f"excluded {n_before - len(df)} sentences")
-
-    if config.gold_only:
-        df = df[df["footnote_applies"] == True]
+    else:
+        test_texts = set(_load_gold_test_set()["text_cree"])
+        n_before   = len(df)
+        df = df[~df["text_cree"].isin(test_texts)]
+        excluded = n_before - len(df)
+        if excluded:
+            print(f"[calibrate] excluded {excluded} sentences that are in the "
+                  f"fixed gold test set (footnote_applies=True) from training")
 
     figurative = df[df["label"] != "literal"]
     literals   = df[df["label"] == "literal"]
@@ -96,12 +137,22 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
     balanced   = pd.concat([figurative,
                             literals.sample(n=n_lit, random_state=42)])
 
-    records = [
-        {"text": row["text_cree"], "label": LABEL2ID.get(row["label"], 0)}
-        for _, row in balanced.iterrows()
-    ]
+    records = _to_records(balanced)
     counts = balanced["label"].value_counts().to_dict()
     print(f"[calibrate] {len(records)} sentences — {counts}")
+    return records
+
+
+def _load_eval_records(config: CalibrateConfig) -> list[dict]:
+    """Eval set: the fixed gold test set by default, or an explicit override."""
+    if config.eval_file is None:
+        df = _load_gold_test_set()
+    else:
+        df = _read_labeled(config.eval_file, "label")
+    records = _to_records(df)
+    counts = df["label"].value_counts().to_dict()
+    print(f"[calibrate] eval — {len(records)} sentences — {counts}"
+          + ("" if config.eval_file is None else f"  (eval_file={config.eval_file})"))
     return records
 
 
@@ -111,13 +162,19 @@ def calibrate(config: CalibrateConfig) -> str:
     if config.wandb_project:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
-    records = _load_records(config)
-    train_recs, eval_recs = train_test_split(
-        records,
-        test_size=0.2,
-        random_state=42,
-        stratify=[r["label"] for r in records],
-    )
+    train_recs = _load_records(config)
+    if config.holdout_fold is not None:
+        # CV mode: this in-training eval is only a proxy for early stopping —
+        # the honest, held-out score comes later from scripts/evals/eval_cv.py
+        # predicting on the fold this run actually excluded from training.
+        train_recs, eval_recs = train_test_split(
+            train_recs,
+            test_size=0.2,
+            random_state=42,
+            stratify=[r["label"] for r in train_recs],
+        )
+    else:
+        eval_recs = _load_eval_records(config)
     print(f"[calibrate] train={len(train_recs)}  eval={len(eval_recs)}")
 
     tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
@@ -158,6 +215,7 @@ def calibrate(config: CalibrateConfig) -> str:
         greater_is_better=True,
         logging_steps=10,
         report_to="wandb" if config.wandb_project else "none",
+        **get_trainer_device_kwargs(),
         **hub_kwargs,
     )
 

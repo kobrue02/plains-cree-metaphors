@@ -3,6 +3,7 @@ Evaluate CLKD/calibrated checkpoints against the DeepSeek-annotated validation s
 
 Usage:
   python scripts/evals/eval_all.py
+  python scripts/evals/eval_all.py --model "XLM-MLM CLKD (pre-calibration)"
 
 Output files
 ------------
@@ -11,6 +12,7 @@ Output files
 """
 
 from __future__ import annotations
+import argparse
 import os
 import sys
 
@@ -41,6 +43,35 @@ def metrics_for(y_true: list[str], y_pred: list[str]) -> dict:
     row["macro_f1"] = round(macro.get("f1-score",  0.0), 4)
     row["accuracy"] = round(report.get("accuracy", 0.0), 4)
     return row
+
+
+def bootstrap_ci(y_true: list[str], y_pred: list[str],
+                  metric_keys: tuple[str, ...] = ("macro_f1", "f1_idiom", "f1_metaphor", "f1_simile"),
+                  n_boot: int = 2000, seed: int = 42, ci: float = 0.95) -> dict:
+    """Percentile bootstrap CI via sentence-level resampling (with replacement).
+
+    Quantifies how much each metric could shift under a different draw of this
+    small evaluation set — not predictor stochasticity — which is the concern
+    for a 228-sentence gold set with only a handful of idiom/metaphor/simile
+    instances. Shared across every script that scores predictions against the
+    gold set, so every reported metric gets a CI alongside the point estimate.
+    """
+    import numpy as np
+    y_true, y_pred = list(y_true), list(y_pred)
+    n = len(y_true)
+    rng = np.random.RandomState(seed)
+    samples = {k: [] for k in metric_keys}
+    for _ in range(n_boot):
+        idx = rng.randint(0, n, size=n)
+        m = metrics_for([y_true[i] for i in idx], [y_pred[i] for i in idx])
+        for k in metric_keys:
+            samples[k].append(m[k])
+    lo_pct, hi_pct = (1 - ci) / 2 * 100, (1 + ci) / 2 * 100
+    out = {}
+    for k in metric_keys:
+        out[f"{k}_ci_lo"] = round(float(np.percentile(samples[k], lo_pct)), 4)
+        out[f"{k}_ci_hi"] = round(float(np.percentile(samples[k], hi_pct)), 4)
+    return out
 
 
 # ── Shared model list ────────────────────────────────────────────────────────
@@ -99,17 +130,23 @@ ANNOT_FILE = "data/figurative/bloomfield_annotated.parquet"
 
 # ── Task: validation ──────────────────────────────────────────────────────────
 
-def task_validation() -> None:
+def task_validation(model: str | None = None) -> None:
     """Evaluate CLKD/calibrated models against the DeepSeek-annotated validation set."""
     output_full = "data/figurative/eval_validation_full.parquet"
     output_gold = "data/figurative/eval_validation_gold.parquet"
+
+    models = _VALIDATION_MODELS if model is None else [
+        c for c in _VALIDATION_MODELS if c[0] == model
+    ]
+    if not models:
+        sys.exit(f"No model named {model!r}. Choices: {[c[0] for c in _VALIDATION_MODELS]}")
 
     def evaluate(df: pd.DataFrame, subset_name: str) -> list[dict]:
         cree_texts = df["text_cree"].tolist()
         y_true     = df["label"].tolist()
 
         rows = []
-        for name, ckpt in _VALIDATION_MODELS:
+        for name, ckpt in models:
             print(f"\n{'='*60}\n  {name}  [{subset_name}]")
             try:
                 model, tok = load_model(ckpt)
@@ -119,9 +156,11 @@ def task_validation() -> None:
                 torch.cuda.empty_cache()
 
                 m = metrics_for(y_true, y_pred)
-                print(f"  macro F1={m['macro_f1']:.3f}  "
+                ci = bootstrap_ci(y_true, y_pred)
+                print(f"  macro F1={m['macro_f1']:.3f} "
+                      f"[{ci['macro_f1_ci_lo']:.3f}, {ci['macro_f1_ci_hi']:.3f}]  "
                       + "  ".join(f"{l}={m[f'f1_{l}']:.2f}" for l in LABEL_NAMES))
-                rows.append({"model": name, "checkpoint": ckpt, **m})
+                rows.append({"model": name, "checkpoint": ckpt, **m, **ci})
             except Exception as exc:
                 print(f"  SKIPPED — {exc}")
                 rows.append({"model": name, "checkpoint": ckpt, "error": str(exc)})
@@ -160,4 +199,7 @@ def task_validation() -> None:
 
 
 if __name__ == "__main__":
-    task_validation()
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--model", default=None, help="Only run this one model (by label in _VALIDATION_MODELS)")
+    args = p.parse_args()
+    task_validation(model=args.model)

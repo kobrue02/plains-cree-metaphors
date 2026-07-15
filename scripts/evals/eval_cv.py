@@ -28,7 +28,7 @@ import pandas as pd
 
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
-from scripts.evals.eval_all import metrics_for
+from scripts.evals.eval_all import metrics_for, bootstrap_ci
 
 ANNOT_FILE    = "data/figurative/bloomfield_annotated.parquet"
 CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
@@ -133,15 +133,19 @@ def main() -> None:
             continue
 
         m_full = metrics_for(result["label"].tolist(), result["pred"].tolist())
-        print(f"  [full] macro F1={m_full['macro_f1']:.3f}  "
+        ci_full = bootstrap_ci(result["label"].tolist(), result["pred"].tolist())
+        print(f"  [full] macro F1={m_full['macro_f1']:.3f} "
+              f"[{ci_full['macro_f1_ci_lo']:.3f}, {ci_full['macro_f1_ci_hi']:.3f}]  "
               + "  ".join(f"{l}={m_full[f'f1_{l}']:.2f}" for l in LABEL_NAMES))
-        rows_full.append({"model": name, "model_id": model_id, "n": len(result), **m_full})
+        rows_full.append({"model": name, "model_id": model_id, "n": len(result), **m_full, **ci_full})
 
         gold_result = result[result["footnote_applies"] == True]
         m_gold = metrics_for(gold_result["label"].tolist(), gold_result["pred"].tolist())
-        print(f"  [gold] macro F1={m_gold['macro_f1']:.3f}  "
+        ci_gold = bootstrap_ci(gold_result["label"].tolist(), gold_result["pred"].tolist())
+        print(f"  [gold] macro F1={m_gold['macro_f1']:.3f} "
+              f"[{ci_gold['macro_f1_ci_lo']:.3f}, {ci_gold['macro_f1_ci_hi']:.3f}]  "
               + "  ".join(f"{l}={m_gold[f'f1_{l}']:.2f}" for l in LABEL_NAMES))
-        rows_gold.append({"model": name, "model_id": model_id, "n": len(gold_result), **m_gold})
+        rows_gold.append({"model": name, "model_id": model_id, "n": len(gold_result), **m_gold, **ci_gold})
 
     os.makedirs("data/figurative", exist_ok=True)
     pd.DataFrame(rows_full).to_parquet("data/figurative/eval_cv_full.parquet", index=False)

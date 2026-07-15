@@ -26,7 +26,7 @@ from transformers import (
     TrainingArguments,
 )
 
-from src.device import get_device, get_precision_kwargs
+from src.device import get_device, get_precision_kwargs, get_trainer_device_kwargs
 from src.mt.tlm_eval import bitext_retrieval, pseudo_perplexity
 
 
@@ -311,6 +311,7 @@ class TLMFinetuner:
             report_to="wandb" if cfg.wandb_project else "none",
             remove_unused_columns=not use_contrastive,
             **get_precision_kwargs(),
+            **get_trainer_device_kwargs(),
             seed=cfg.seed,
             **hub_kwargs,
         )

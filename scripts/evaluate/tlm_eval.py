@@ -27,6 +27,7 @@ from transformers import AutoTokenizer, AutoModelForMaskedLM
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
+from src.device import get_device
 from src.mt.tlm_eval import bitext_retrieval, pseudo_perplexity
 
 SENTENCES_FILE = "data/sentences.parquet"
@@ -82,7 +83,7 @@ def main() -> None:
     p.add_argument("--seed",     type=int, default=SEED)
     args = p.parse_args()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
     print(f"Device: {device}")
 
     # Load and split data — use a fixed held-out split so results are comparable

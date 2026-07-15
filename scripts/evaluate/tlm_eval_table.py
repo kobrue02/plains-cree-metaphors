@@ -21,6 +21,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 import torch
 import pandas as pd
 
+from src.device import get_device
 from scripts.evaluate.tlm_eval import evaluate, SENTENCES_FILE, DEFAULT_N, SEED
 
 # NOTE: the +TLM+InfoNCE row points at a *local* checkpoint path
@@ -72,7 +73,7 @@ def main() -> None:
     ordered_labels = [l for l, _ in DEFAULT_MODELS if l in models] + \
                      [l for l in models if l not in dict(DEFAULT_MODELS)]
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = get_device()
     print(f"Device: {device}")
 
     df = pd.read_parquet(args.sentences_file).dropna(subset=["text_cree", "text_en"])

@@ -66,7 +66,7 @@ def render_stage_card(stage: str, base_model: str, **kw) -> tuple[str, str]:
                   warm_start (mono-MLM checkpoint id, if used),
                   contrastive_alpha, contrastive_temperature
       clkd:       student_base, teacher, freeze_n_layers, temperature, epochs, learning_rate
-      calibrated: student_base, literal_ratio, gold_only, epochs, learning_rate, ablation_note
+      calibrated: student_base, literal_ratio, epochs, learning_rate, ablation_note
     """
     if stage == "tlm":
         warm_note = (
@@ -135,8 +135,6 @@ The student is trained to match these distributions on the Cree side via KL dive
 
     if stage == "calibrated":
         student    = kw.get("student_base", base_model)
-        gold_only  = kw.get("gold_only", False)
-        gold_note  = "footnote_applies=True sentences only" if gold_only else "all DeepSeek-annotated sentences"
         abl_note   = f"\n**Ablation condition:** {kw['ablation_note']}\n" if kw.get("ablation_note") else ""
         summary = (
             f"{base_model} calibrated on DeepSeek-annotated Bloomfield Plains Cree sentences "
@@ -145,7 +143,8 @@ The student is trained to match these distributions on the Cree side via KL dive
         details = f"""\
 ## Training
 
-Low-LR calibration of a CLKD checkpoint on gold/silver Bloomfield validation data ({gold_note}).
+Low-LR calibration of a CLKD checkpoint on gold/silver Bloomfield validation data, held out and \
+evaluated against the 219 footnote-verified gold sentences.
 {abl_note}
 **Base checkpoint:** `{student}`
 **Literal : figurative ratio:** {kw.get('literal_ratio', 3)}:1 | **Epochs:** {kw.get('epochs', 10)} | **Learning rate:** {kw.get('learning_rate', 5e-6)}

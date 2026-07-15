@@ -58,7 +58,7 @@ import pandas as pd
 
 from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
-from scripts.evals.eval_all import metrics_for
+from scripts.evals.eval_all import metrics_for, bootstrap_ci
 
 GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 N_FOLDS     = 5
@@ -85,29 +85,40 @@ def fold_dir(model_id: str, fold: int) -> str:
 def eval_majority(gold: pd.DataFrame) -> dict:
     y_true = gold["label"].tolist()
     y_pred = ["literal"] * len(gold)
-    return metrics_for(y_true, y_pred)
+    return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
 
 
 # ── Row: Random (uniform over the 4 classes) ───────────────────────────────────
 
-def eval_random(gold: pd.DataFrame, trials: int = 200, seed: int = 42) -> dict:
+def eval_random(gold: pd.DataFrame, trials: int = 200, seed: int = 42, ci: float = 0.95) -> dict:
     """Uniform random guessing among the 4 classes, averaged over many trials
     (a single draw is noisy for the rare classes — idiom/metaphor/simile only
-    have a handful of instances in the gold pool)."""
+    have a handful of instances in the gold pool).
+
+    CI here comes from the spread across the `trials` draws themselves (predictor
+    randomness), not sentence-resampling — a different source of uncertainty than
+    bootstrap_ci() used for the other rows, but reported under the same
+    *_ci_lo/_ci_hi keys so the results table stays uniform."""
     import numpy as np
     rng = np.random.RandomState(seed)
     y_true = gold["label"].tolist()
     n = len(y_true)
 
-    accum = {k: 0.0 for k in
-             [f"{p}_{l}" for p in ("p", "r", "f1") for l in LABEL_NAMES]
-             + ["macro_p", "macro_r", "macro_f1", "accuracy"]}
+    keys = ([f"{p}_{l}" for p in ("p", "r", "f1") for l in LABEL_NAMES]
+            + ["macro_p", "macro_r", "macro_f1", "accuracy"])
+    per_trial = {k: [] for k in keys}
     for _ in range(trials):
         y_pred = rng.choice(LABEL_NAMES, size=n).tolist()
         m = metrics_for(y_true, y_pred)
-        for k in accum:
-            accum[k] += m[k]
-    return {k: round(v / trials, 4) for k, v in accum.items()}
+        for k in keys:
+            per_trial[k].append(m[k])
+
+    out = {k: round(float(np.mean(v)), 4) for k, v in per_trial.items()}
+    lo_pct, hi_pct = (1 - ci) / 2 * 100, (1 + ci) / 2 * 100
+    for k in ("macro_f1", "f1_idiom", "f1_metaphor", "f1_simile"):
+        out[f"{k}_ci_lo"] = round(float(np.percentile(per_trial[k], lo_pct)), 4)
+        out[f"{k}_ci_hi"] = round(float(np.percentile(per_trial[k], hi_pct)), 4)
+    return out
 
 
 # ── Rows evaluated directly (checkpoint never trained on the gold pool) ────────
@@ -121,7 +132,7 @@ def eval_direct(checkpoint: str, gold: pd.DataFrame) -> dict:
     del model
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
-    return metrics_for(y_true, y_pred)
+    return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
 
 
 # ── Row: Full (+TLM+CLKD+SFT) — honest 5-fold CV ────────────────────────────────
@@ -162,7 +173,8 @@ def eval_cv(model_id: str, gold: pd.DataFrame) -> dict | None:
         all_preds.append(out)
 
     combined = pd.concat(all_preds, ignore_index=True)
-    return metrics_for(combined["label"].tolist(), combined["pred"].tolist())
+    y_true, y_pred = combined["label"].tolist(), combined["pred"].tolist()
+    return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -245,16 +257,19 @@ def main() -> None:
     os.makedirs(os.path.dirname(args.out), exist_ok=True)
     df.to_parquet(args.out, index=False)
 
-    print(f"\n{'='*90}")
-    print("| Model | Macro P | Macro R | Macro F1 | Literal | Idiom | Metaphor | Simile |")
+    print(f"\n{'='*110}")
+    print("| Model | Macro P | Macro R | Macro F1 (95% CI) | Literal | Idiom | Metaphor | Simile |")
     print("| --- | --- | --- | --- | --- | --- | --- | --- |")
     for r in rows:
         if "error" in r:
             print(f"| {r['model']} | — | — | — | — | — | — | — |  (not available: {r['error'][:50]})")
         else:
-            print(f"| {r['model']} | {r['macro_p']:.3f} | {r['macro_r']:.3f} | {r['macro_f1']:.3f} | "
+            f1_col = f"{r['macro_f1']:.3f}"
+            if "macro_f1_ci_lo" in r:
+                f1_col += f" [{r['macro_f1_ci_lo']:.3f}, {r['macro_f1_ci_hi']:.3f}]"
+            print(f"| {r['model']} | {r['macro_p']:.3f} | {r['macro_r']:.3f} | {f1_col} | "
                   f"{r['f1_literal']:.3f} | {r['f1_idiom']:.3f} | {r['f1_metaphor']:.3f} | {r['f1_simile']:.3f} |")
-    print(f"{'='*90}")
+    print(f"{'='*110}")
     print(f"\nFull metrics (incl. precision/recall) saved → {args.out}")
 
 

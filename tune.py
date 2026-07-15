@@ -90,7 +90,6 @@ def run_calibrate(args: argparse.Namespace) -> None:
         learning_rate=cfg.get("learning_rate", 5e-6),
         literal_ratio=cfg.get("literal_ratio", 3),
         max_length=args.max_length,
-        gold_only=args.gold_only,
         wandb_project=WANDB_PROJECT,
     )
 
@@ -131,7 +130,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
             learning_rate=float(cfg.get("calibrate_lr", 5e-6)),
             literal_ratio=int(cfg.get("calibrate_literal_ratio", 3)),
             max_length=args.max_length,
-            gold_only=args.gold_only,
             wandb_project=WANDB_PROJECT,
         )
     finally:
@@ -165,7 +163,6 @@ def main() -> None:
     p.add_argument("--teacher",        default=TEACHER)
     p.add_argument("--batch-size",     type=int,  default=16)
     p.add_argument("--max-length",     type=int,  default=256)
-    p.add_argument("--gold-only",      action="store_true")
 
     args = p.parse_args()
 

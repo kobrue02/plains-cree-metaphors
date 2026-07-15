@@ -1,10 +1,21 @@
+"""
+NVIDIA-hosted model access (https://integrate.api.nvidia.com), for comparing
+other models against DeepSeek on the same figurative-language annotation
+procedure. Uses the same shared prompt as src/annotate/deepseek.py (see
+src/annotate/figurative_prompt.py) — no per-provider prompt drift.
+
+NVIDIA's endpoint is OpenAI-compatible, so this uses the OpenAI SDK (matching
+src/annotate/deepseek.py) rather than raw requests — the SDK retries transient
+errors (429/5xx/timeouts) internally, which a hand-rolled requests.post did not.
+"""
+
+from __future__ import annotations
 import os
-import requests, base64
 from pathlib import Path
 
+from openai import OpenAI
 
-invoke_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-stream = False
+from src.annotate.figurative_prompt import SYSTEM_PROMPT, parse_label
 
 
 def _load_api_key() -> str:
@@ -21,45 +32,68 @@ def _load_api_key() -> str:
     )
 
 
-MODEL_ID = "mistralai/mistral-medium-3.5-128b"
+client = OpenAI(
+    base_url="https://integrate.api.nvidia.com/v1",
+    api_key=_load_api_key(),
+    max_retries=6,          # SDK backs off internally on 429/5xx/timeouts
+    timeout=240.0,
+)
 
 
-def format_prompt(text_cree: str, text_en: str, footnote_en: str) -> str:
-    prompt = f"""
-You are a helpful assistant for annotating Plains Cree texts, and your specialty are figurative language phenomena, such as metaphors, similes, idioms, and proverbs.
-You are given a paragraph in Plains Cree, its English translation, and an optional footnote. 
-Read all three carefully. If the footnote contains information about figurative language in the paragraph, use that information to inform your annotation.
-Here is the paragraph to analyze:
-Cree: {text_cree}
-English: {text_en}
-Footnote: {footnote_en if footnote_en else "None"}
-Please return only one word, either "simile", "metaphor", "idiom", "proverb", or "none" if there is no figurative language.
-    """
+def call_llm(model_id: str, system: str, prompt: str,
+             max_tokens: int = 16384, reasoning: bool = True) -> tuple[str, str]:
+    """Returns (reasoning, content). Set reasoning=False for plain instruct
+    models that don't support reasoning_effort (e.g. meta/llama-3.3-70b-instruct) —
+    sending it to a model that doesn't understand it risks a 400, not a no-op.
 
-    return prompt
+    max_tokens defaults high (was 8192) because reasoning_effort="high" can burn
+    the entire budget on the reasoning chain before ever emitting the final
+    answer, especially with the longer patched SYSTEM_PROMPT (figurative_prompt.py)
+    — observed as an empty response silently defaulting to "literal" in
+    make_annotate_fn below, which would systematically bias a large annotation
+    run toward the majority class rather than failing loudly."""
+    kwargs = {"extra_body": {"reasoning_effort": "high"}} if reasoning else {}
+    resp = client.chat.completions.create(
+        model=model_id,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": prompt},
+        ],
+        max_tokens=max_tokens,
+        temperature=0.70,
+        top_p=1.00,
+        stream=False,
+        **kwargs,
+    )
+    msg = resp.choices[0].message
+    reasoning_text = (getattr(msg, "reasoning_content", None) or "").strip()
+    content        = (msg.content or "").strip()
+    return reasoning_text, content
 
-def call_llm(prompt: str) -> tuple[str, str]:
-    headers = {
-        "Authorization": f"Bearer {_load_api_key()}",
-        "Accept": "application/json"
-    }
 
-    payload = {
-        "model": MODEL_ID,
-        "reasoning_effort": "high",
-        "messages": [{"role":"user","content":prompt}],
-        "max_tokens": 16384,
-        "temperature": 0.70,
-        "top_p": 1.00,
-        "stream": stream
-    }
+def make_annotate_fn(model_id: str, reasoning: bool = True, retries: int = 3):
+    """Returns a (prompt) -> (label, reasoning) callable for the given NVIDIA
+    model, matching src/annotate/deepseek.py's _deepseek_annotate signature —
+    pass it as annotate_fn to scripts/annotate/deepseek_label_pool.py's
+    annotate_pool()/​_annotate_one() to reuse that same pool-annotation loop.
+    Pass reasoning=False for plain instruct models (see call_llm).
 
-    r = requests.post(invoke_url, headers=headers, json=payload, timeout=60)
-    r.raise_for_status()
-    response = r.json()
-    if "choices" not in response:
-        raise RuntimeError(f"Unexpected API response: {response}")
-    msg = response["choices"][0]["message"]
-    reasoning = msg.get("reasoning") or ""
-    label = msg.get("content", "").strip().lower()
-    return reasoning, label
+    An empty/unparseable response (reasoning_effort burning the whole token
+    budget before emitting an answer) is NOT silently defaulted to "literal"
+    here — that would get written into the cache as if it were a genuine
+    result, permanently defeating annotate_pool()'s resume-safe retry (a
+    sentence the cache thinks is "done" never gets revisited). Instead this
+    retries a few times (temperature=0.70 means a retry can genuinely get a
+    different, complete answer) and raises if still empty, so the caller's
+    existing "don't cache, retry next run" exception handling takes over."""
+    def annotate(prompt: str) -> tuple[str, str]:
+        for attempt in range(retries + 1):
+            reasoning_text, content = call_llm(model_id, SYSTEM_PROMPT, prompt, reasoning=reasoning)
+            label = parse_label(content)
+            if label is not None:
+                full_reasoning = f"{reasoning_text}\n\n--- final answer ---\n{content}".strip()
+                return label, full_reasoning
+            print(f"  [{model_id}] empty/unparseable response on attempt {attempt + 1}/{retries + 1} "
+                  f"(content={content[:80]!r})" + ("; retrying" if attempt < retries else "; giving up"))
+        raise RuntimeError(f"{model_id}: empty/unparseable response after {retries + 1} attempts")
+    return annotate
