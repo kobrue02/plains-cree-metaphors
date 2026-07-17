@@ -93,11 +93,11 @@ def load_gold(footnoted_only: bool) -> pd.DataFrame:
     return df
 
 
-def load_silver() -> pd.DataFrame:
-    if not os.path.exists(SILVER_FILE):
-        print(f"[warn] silver file not found (deepseek_label_pool.py hasn't finished/run yet): {SILVER_FILE}")
+def load_silver(silver_file: str = SILVER_FILE) -> pd.DataFrame:
+    if not os.path.exists(silver_file):
+        print(f"[warn] silver file not found (deepseek_label_pool.py hasn't finished/run yet): {silver_file}")
         return pd.DataFrame(columns=["text_cree", "text_en", "label", "source_file", "manuscript"])
-    df = pd.read_parquet(SILVER_FILE).rename(columns={"deepseek_label": "label"})
+    df = pd.read_parquet(silver_file).rename(columns={"deepseek_label": "label"})
     df = df[["text_cree", "text_en", "label"]].copy()
     df["annotation_type"] = "silver"
     df["text_cree"] = df["text_cree"].astype(str).str.strip()
@@ -110,9 +110,9 @@ def load_silver() -> pd.DataFrame:
     return df
 
 
-def build_final(footnoted_only: bool) -> pd.DataFrame:
+def build_final(footnoted_only: bool, silver_file: str = SILVER_FILE) -> pd.DataFrame:
     gold   = load_gold(footnoted_only)
-    silver = load_silver()
+    silver = load_silver(silver_file)
     combined = pd.concat([gold, silver], ignore_index=True)
     combined["text_cree"] = combined["text_cree"].astype(str).str.strip()
     # gold appears first -> keep="first" makes gold win on overlap
@@ -165,11 +165,13 @@ def main() -> None:
                         "all footnoted-paragraph sentences (1,225 rows)")
     p.add_argument("--out", default="data/figurative/final_dataset_stats.parquet",
                    help="Where to save the combined final dataset's per-label/source counts")
+    p.add_argument("--silver-file", default=SILVER_FILE,
+                   help="Silver annotation file to use (default: %(default)s)")
     args = p.parse_args()
 
     gold   = load_gold(args.gold_footnoted_only)
-    silver = load_silver()
-    final  = build_final(args.gold_footnoted_only)
+    silver = load_silver(args.silver_file)
+    final  = build_final(args.gold_footnoted_only, args.silver_file)
 
     report(f"Gold ({'footnote-verified only' if args.gold_footnoted_only else 'all footnoted-paragraph sentences'})", gold)
     report("Silver (dictionary-grounded, un-footnoted majority)", silver)

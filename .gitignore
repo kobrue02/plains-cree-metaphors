@@ -19,5 +19,8 @@ wheels/
 *.parquet
 *.jsonl
 *.md
+*.pdf
+*.log
+*.bak
 
 wandb/
