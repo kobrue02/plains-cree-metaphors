@@ -5,20 +5,21 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --gres=gpu:1
-#SBATCH --time=02:30:00
+#SBATCH --time=00:30:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err
 #SBATCH --mail-type=ALL
 #SBATCH --mail-user=konrad-rudolf.brueggemann@student.uni-tuebingen.de
 
-# Runs all 5 CV folds sequentially in ONE job allocation. Submitted by
-# jobs/calibrate_cv.sh, which is the thing to actually call — not this file
-# directly. Trades cross-fold parallelism (5 GPUs at once) for paying
-# queue-wait + environment setup (module load, uv sync) once instead of 5
-# times; worth it when queue wait dominates fold runtime on your cluster.
+# Runs ONE CV fold. Submitted by jobs/calibrate_cv.sh, which submits 5 of
+# these (one per fold) — not meant to be called directly. Used to run all 5
+# folds sequentially in a single allocation to save on queue-wait +
+# environment setup, but gpu_a100_short's walltime cap (30 min, down from
+# the 2h30m this used to request) no longer leaves room for that — so each
+# fold is now its own job instead.
 #
-# All args are forwarded to pipeline.py for every fold, with --holdout-fold
-# appended per iteration.
+# All args (including --holdout-fold, appended by the caller) are forwarded
+# to pipeline.py as-is.
 
 PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
 
@@ -39,18 +40,13 @@ cd $PROJECT_ROOT
 uv sync
 mkdir -p logs
 
-echo "Starting 5-fold CV calibration with args: $@"
-for FOLD in 0 1 2 3 4; do
-  echo ""
-  echo "═══ Fold $FOLD ═══"
-  # --skip-tlm --skip-clkd are non-negotiable here, not just defaults — this
-  # script's only job is the calibration stage from an already-produced
-  # checkpoint. Without them pipeline.py would retrain TLM+CLKD from scratch
-  # for every one of the 5 folds.
-  python3 pipeline.py "$@" --skip-tlm --skip-clkd --holdout-fold "$FOLD"
-  if [ $? -ne 0 ]; then
-    echo "Fold $FOLD failed." && exit 1
-  fi
-done
+echo "Starting single-fold CV calibration with args: $@"
+# --skip-tlm --skip-clkd are non-negotiable here, not just defaults — this
+# script's only job is the calibration stage from an already-produced
+# checkpoint. Without them pipeline.py would retrain TLM+CLKD from scratch.
+python3 pipeline.py "$@" --skip-tlm --skip-clkd
+if [ $? -ne 0 ]; then
+  echo "Fold failed." && exit 1
+fi
 
-echo "All 5 folds complete."
+echo "Fold complete."
