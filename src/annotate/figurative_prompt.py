@@ -16,6 +16,7 @@ identical procedure — no per-provider prompt drift.
 """
 
 from __future__ import annotations
+import hashlib
 
 LABELS = ["literal", "idiom", "metaphor", "simile"]
 
@@ -114,6 +115,16 @@ SYSTEM_PROMPT = (
 )
 assert _IDIOM_GLOSS_PATCH in SYSTEM_PROMPT, "idiom-gloss patch failed to apply"
 assert _CONSTRUCTIONAL_PATCH in SYSTEM_PROMPT, "constructional patch failed to apply"
+
+
+def prompt_version(prompt: str) -> str:
+    """Short fingerprint of a system prompt string. Stamped onto every cached
+    annotation (see annotate_pool() / ablation_llm_grounding.py's load_cache())
+    so a prompt change (e.g. the idiom-gloss/constructional patches above)
+    invalidates stale cache entries automatically instead of silently serving
+    pre-patch labels forever — this bit us once (deepseek_on_gold_* files from
+    before the patch existed kept looking current after rerunning)."""
+    return hashlib.sha256(prompt.encode()).hexdigest()[:10]
 
 
 def parse_label(content: str) -> str | None:

@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 import pandas as pd
 
 from src.annotate.deepseek import client, MODEL_ID
-from src.annotate.figurative_prompt import parse_label, LABELS, SYSTEM_PROMPT
+from src.annotate.figurative_prompt import parse_label, LABELS, SYSTEM_PROMPT, prompt_version
 from src.scrapers.itwewina import lookup_sentence, format_for_prompt
 from scripts.evals.eval_all import metrics_for, bootstrap_ci
 
@@ -197,13 +197,23 @@ def make_nvidia_call_fn(model_id: str, reasoning: bool):
     return _call
 
 
-def load_cache(path: str) -> dict[str, str]:
+def load_cache(path: str, version: str | None = None) -> dict[str, str]:
+    """version: prompt_version() of this condition's own system_prompt. Entries
+    stamped with a different (or missing/pre-versioning) version are dropped —
+    see the matching fix in deepseek_label_pool.py's load_cache()."""
     cache: dict[str, str] = {}
+    stale = 0
     if os.path.exists(path):
         with open(path) as f:
             for line in f:
                 rec = json.loads(line)
+                if version is not None and rec.get("prompt_version") != version:
+                    stale += 1
+                    continue
                 cache[rec["text_cree"]] = rec["label"]
+    if stale:
+        print(f"  [cache] {stale:,} entries in {path} used a different prompt "
+              f"version — treating as not-yet-annotated and re-querying")
     return cache
 
 
@@ -222,7 +232,8 @@ def _build_and_call(cfg: dict, call_fn, row) -> str:
 def run_condition(name: str, gold: pd.DataFrame, workers: int, conditions: dict, call_fn) -> dict:
     cfg = conditions[name]
     cache_path = cfg["cache_file"]
-    cache = load_cache(cache_path)
+    version = prompt_version(cfg["system_prompt"])
+    cache = load_cache(cache_path, version=version)
     todo = gold[~gold["text_cree"].isin(cache.keys())]
     print(f"[{name}] {len(cache):,} cached | {len(todo):,} to annotate (workers={workers})")
 
@@ -242,7 +253,9 @@ def run_condition(name: str, gold: pd.DataFrame, workers: int, conditions: dict,
                     print(f"  [{name}] error on {text_cree[:40]!r}: {exc} — will retry next run")
                     continue
                 cache[text_cree] = label
-                cache_f.write(json.dumps({"text_cree": text_cree, "label": label}) + "\n")
+                cache_f.write(json.dumps({
+                    "text_cree": text_cree, "label": label, "prompt_version": version,
+                }) + "\n")
                 cache_f.flush()
                 done += 1
                 if done % 5 == 0:

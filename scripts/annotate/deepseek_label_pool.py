@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..',
 
 from scripts.annotate._pool_utils import load_pool, POOL_FILE, EXCLUDE_SOURCE
 from src.annotate.deepseek import client, MODEL_ID
-from src.annotate.figurative_prompt import LABELS, SYSTEM_PROMPT, parse_label
+from src.annotate.figurative_prompt import LABELS, SYSTEM_PROMPT, parse_label, prompt_version
 from src.scrapers.itwewina import lookup_sentence, format_for_prompt
 
 OUTPUT_FILE = "data/figurative/deepseek_labels.parquet"
@@ -96,16 +96,27 @@ def _annotate_one(text_cree: str, text_en: str, annotate_fn=_deepseek_annotate) 
     return text_cree, label, reasoning
 
 
-def load_cache(cache_path: str) -> dict[str, dict]:
+def load_cache(cache_path: str, version: str | None = None) -> dict[str, dict]:
+    """version: current prompt_version(SYSTEM_PROMPT). Entries stamped with a
+    different (or missing/pre-versioning) prompt_version are dropped — they
+    were annotated under a prompt that no longer exists, so treating them as
+    "already done" would silently freeze in stale labels after a prompt patch."""
     cache: dict[str, dict] = {}
+    stale = 0
     if os.path.exists(cache_path):
         with open(cache_path, encoding="utf-8") as f:
             for line in f:
                 entry = json.loads(line)
+                if version is not None and entry.get("prompt_version") != version:
+                    stale += 1
+                    continue
                 cache[entry["text_cree"]] = {
                     "label":     entry["label"],
                     "reasoning": entry.get("reasoning", ""),
                 }
+    if stale:
+        print(f"  [cache] {stale:,} entries in {cache_path} used a different prompt "
+              f"version — treating as not-yet-annotated and re-querying")
     return cache
 
 
@@ -113,7 +124,8 @@ def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_ann
     """annotate_fn: (prompt: str) -> (label, reasoning), forwarded to _annotate_one
     for every sentence — swap it to reuse this pool-annotation loop for another
     provider/model (see src/annotate/llm.py)."""
-    cache = load_cache(cache_path)
+    version = prompt_version(SYSTEM_PROMPT)
+    cache = load_cache(cache_path, version=version)
     todo  = pool[~pool["text_cree"].isin(cache.keys())]
     print(f"[annotate] {len(cache):,} cached  |  {len(todo):,} to annotate  "
           f"(workers={workers})")
@@ -144,6 +156,7 @@ def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_ann
             cache[text_cree] = {"label": label, "reasoning": reasoning}
             cache_f.write(json.dumps({
                 "text_cree": text_cree, "label": label, "reasoning": reasoning,
+                "prompt_version": version,
             }) + "\n")
             cache_f.flush()
 

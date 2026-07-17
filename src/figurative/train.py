@@ -7,6 +7,7 @@ Labels: 0=literal, 1=idiom, 2=metaphor
 from __future__ import annotations
 import os
 
+import pandas as pd
 import torch
 import torch.nn as nn
 from transformers import (
@@ -21,6 +22,34 @@ from src.figurative.config import FigurativeConfig
 from src.figurative.data import build_datasets, class_weights_from, resolve_use_fast, LABEL_NAMES, NUM_LABELS
 from src.figurative.evaluate import compute_metrics
 from src.device import get_precision_kwargs
+
+RESULTS_FILE = "data/figurative/english_finetune_results.parquet"
+
+
+def _save_metrics(config: FigurativeConfig, metrics: dict) -> None:
+    """Persist this run's final (best-checkpoint) eval metrics, keyed by
+    experiment_name — otherwise these numbers only ever exist in wandb (if
+    logged there) or the Trainer's in-memory state, easy to lose track of
+    (see e.g. the deberta_teacher checkpoint, trained with no metrics saved
+    anywhere). One row per experiment_name; reruns overwrite their own row."""
+    row = {
+        "experiment_name": config.experiment_name,
+        "encoder":         config.encoder,
+        "hub_model_id":    config.hub_model_id,
+        "epochs":          config.epochs,
+        "learning_rate":   config.learning_rate,
+        "macro_f1":        metrics.get("eval_macro_f1"),
+        **{f"{name}_f1": metrics.get(f"eval_{name}_f1") for name in LABEL_NAMES},
+    }
+    os.makedirs(os.path.dirname(RESULTS_FILE), exist_ok=True)
+    if os.path.exists(RESULTS_FILE):
+        df = pd.read_parquet(RESULTS_FILE)
+        df = df[df["experiment_name"] != config.experiment_name]
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    else:
+        df = pd.DataFrame([row])
+    df.to_parquet(RESULTS_FILE, index=False)
+    print(f"[train] final macro_f1={row['macro_f1']:.4f} — saved → {RESULTS_FILE}")
 
 
 class WeightedTrainer(Trainer):
@@ -106,6 +135,9 @@ def train(config: FigurativeConfig) -> str:
     tokenizer.save_pretrained(config.checkpoint_dir)
     trainer.save_model(config.checkpoint_dir)
     print(f"[train] saved to {config.checkpoint_dir}")
+
+    final_metrics = trainer.evaluate()
+    _save_metrics(config, final_metrics)
 
     if config.hub_model_id:
         trainer.push_to_hub()
