@@ -24,11 +24,56 @@ import argparse, os, sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from huggingface_hub import ModelCard, ModelCardData, HfApi
+import pandas as pd
+from huggingface_hub import ModelCard, ModelCardData, EvalResult, HfApi
 
 LANGUAGE = "crk"  # Plains Cree ISO 639-3
 AUTHOR   = "KonradBRG"
 TEACHER  = f"{AUTHOR}/deberta-v3-base-figurative"
+
+# Anchored to this file's location, not CWD — a relative path here would
+# silently resolve to nothing (and eval_results_for() would silently return
+# None) if this script is ever invoked from somewhere other than the repo
+# root, which is exactly what happened once already: a card got pushed with
+# its whole "Results" section missing and no error printed anywhere.
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ENGLISH_RESULTS_FILE = os.path.join(_PROJECT_ROOT, "data/figurative/english_finetune_results.parquet")
+FIGURATIVE_LABELS    = ["literal", "idiom", "metaphor", "simile"]
+
+
+def eval_results_for(experiment_name: str, dataset_name: str = "VUA20 + MAGPIE + FLUTE") -> list[EvalResult] | None:
+    """Pull this run's real macro/per-label F1 from english_finetune_results.parquet
+    (see src/figurative/train.py's _save_metrics) and turn them into HF
+    EvalResult entries — these render as the "Evaluation results" widget on the
+    Hub page, the same mechanism trainer.push_to_hub() uses for its own
+    auto-generated card. Returns None (loudly, never silently) if the run
+    isn't in the file yet, so a missing-metrics card is an obvious warning in
+    the log, not a card that silently loses its whole Results section."""
+    if not os.path.exists(ENGLISH_RESULTS_FILE):
+        print(f"[cards] WARNING: {ENGLISH_RESULTS_FILE} not found — "
+              f"'{experiment_name}' card will be pushed WITHOUT a Results section")
+        return None
+    df = pd.read_parquet(ENGLISH_RESULTS_FILE)
+    row = df[df["experiment_name"] == experiment_name]
+    if row.empty:
+        print(f"[cards] WARNING: no row for experiment_name='{experiment_name}' in "
+              f"{ENGLISH_RESULTS_FILE} — card will be pushed WITHOUT a Results section")
+        return None
+    row = row.iloc[0]
+
+    def _metric(metric_type: str, metric_name: str, value) -> EvalResult | None:
+        if value is None or pd.isna(value):
+            return None
+        return EvalResult(
+            task_type="text-classification", task_name="Figurative Language Detection",
+            dataset_type="vua20-magpie-flute", dataset_name=dataset_name,
+            metric_type=metric_type, metric_name=metric_name, metric_value=round(float(value), 4),
+        )
+
+    results = [_metric("f1_macro", "Macro F1", row.get("macro_f1"))]
+    for name in FIGURATIVE_LABELS:
+        results.append(_metric(f"f1_{name}", f"{name.capitalize()} F1", row.get(f"{name}_f1")))
+    return [r for r in results if r is not None]
 
 CITATION_SECTION = """\
 ## Citation
@@ -201,11 +246,12 @@ MODELS = [
 
     # ── Figurative classifiers (English teacher / baselines) ──────────────────
     dict(
-        repo_id    = f"{AUTHOR}/deberta-v3-base-figurative",
-        base_model = "microsoft/deberta-v3-base",
-        tags       = ["figurative-language", "text-classification", "english"],
-        task       = "text-classification",
-        language   = "en",
+        repo_id         = f"{AUTHOR}/deberta-v3-base-figurative",
+        base_model      = "microsoft/deberta-v3-base",
+        tags            = ["figurative-language", "text-classification", "english"],
+        task            = "text-classification",
+        language        = "en",
+        experiment_name = "deberta_figurative",  # key into english_finetune_results.parquet
         summary    = "DeBERTa-v3-base fine-tuned on VUA20 + MAGPIE + FLUTE for 4-class figurative language detection (literal / idiom / metaphor / simile).",
         details    = """\
 ## Training
@@ -216,7 +262,7 @@ Fine-tuned on a combination of:
 - **FLUTE** — figurative language understanding
 
 **Labels:** `literal` (0), `idiom` (1), `metaphor` (2), `simile` (3)
-**Epochs:** 10 | **Hardware:** 1× NVIDIA A100 40 GB
+**Epochs:** up to 20 (early stopping, patience=2) | **Hardware:** 1× NVIDIA A100 40 GB
 
 ## Intended use
 
@@ -419,6 +465,9 @@ def make_card(m: dict) -> ModelCard:
     stage    = m.get("stage")
     tags     = m.get("tags") or STAGE_TAGS.get(stage, [])
     task     = m.get("task") or STAGE_PIPELINE_TAG.get(stage, "text-classification")
+    repo_name = m["repo_id"].split("/")[-1]
+
+    eval_results = eval_results_for(m["experiment_name"]) if m.get("experiment_name") else None
 
     card_data = ModelCardData(
         language      = language if isinstance(language, list) else [language],
@@ -426,6 +475,8 @@ def make_card(m: dict) -> ModelCard:
         base_model    = m["base_model"],
         tags          = tags,
         pipeline_tag  = task,
+        eval_results  = eval_results,
+        model_name    = repo_name if eval_results else None,
     )
 
     if "summary" in m and "details" in m:
@@ -433,17 +484,30 @@ def make_card(m: dict) -> ModelCard:
     else:
         summary, details = render_stage_card(stage, m["base_model"], **m.get("stage_kwargs", {}))
 
+    results_section = ""
+    if eval_results:
+        rows = "\n".join(f"| {r.metric_name} | {r.metric_value} |" for r in eval_results)
+        results_section = f"""
+## Results
+
+Evaluated on a held-out split of {eval_results[0].dataset_name}.
+
+| Metric | Value |
+|---|---|
+{rows}
+"""
+
     content = f"""\
 ---
 { card_data.to_yaml() }
 ---
 
-# { m["repo_id"].split("/")[-1] }
+# { repo_name }
 
 { summary }
 
 { details }
-
+{ results_section }
 { CITATION_SECTION }
 
 { DATA_SECTION }
