@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=FigEnglish_Cree
-#SBATCH --partition=gpu_a100_short
+#SBATCH --partition=gpu_a100_il
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
