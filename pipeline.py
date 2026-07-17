@@ -9,7 +9,7 @@ Stages (all optional, all chainable):
 Hub naming (derived from --model-id):
   TLM        → {hub-prefix}/{model-id}-plains-cree-en-tlm
   CLKD       → {hub-prefix}/{model-id}-plains-cree-en-clkd
-  Calibrated → {hub-prefix}/{model-id}-plains-cree-en-calibrated
+  Calibrated → {hub-prefix}/{model-id}-plains-cree-en-figurative
 
 Examples:
   # Full pipeline, xlm-mlm base
@@ -152,7 +152,7 @@ def main() -> None:
 
     tlm_hub  = hub_id(prefix, mid, "tlm")
     clkd_hub = hub_id(prefix, mid, "clkd")
-    cal_hub  = hub_id(prefix, mid, "calibrated")
+    cal_hub  = hub_id(prefix, mid, "figurative")
 
     # ── Stage 0: Monolingual Cree MLM (ablation only) ─────────────────────────
     # if run, stage 1 starts from this checkpoint instead of the base model

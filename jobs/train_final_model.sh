@@ -148,6 +148,6 @@ fi
 
 echo "Done."
 echo "Honest (leakage-free) macro-F1: data/figurative/eval_cv_gold.parquet, condition '${CV_LABEL}'"
-echo "Deployed checkpoint pushed to: KonradBRG/${MODEL_ID}-plains-cree-en-calibrated"
+echo "Deployed checkpoint pushed to: KonradBRG/${MODEL_ID}-plains-cree-en-figurative"
 echo "(calibrate_results.parquet's number for this run is informational only — an"
 echo " early-stopping diagnostic on the production checkpoint, not the reported metric)"
