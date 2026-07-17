@@ -31,6 +31,7 @@ LABEL2ID = {l: i for i, l in enumerate(LABEL_NAMES)}
 
 CV_FOLDS_FILE = "data/figurative/cv_folds.parquet"
 GOLD_FILE     = "data/figurative/bloomfield_annotated.parquet"
+RESULTS_FILE  = "data/figurative/calibrate_results.parquet"
 
 LABEL_MAP = {
     "literal": "literal", "none": "literal",
@@ -156,6 +157,38 @@ def _load_eval_records(config: CalibrateConfig) -> list[dict]:
     return records
 
 
+def _save_metrics(config: CalibrateConfig, metrics: dict) -> None:
+    """Persist the final (best-checkpoint) eval against the fixed gold test
+    set — calibrate() has always computed this every epoch (it's what
+    early stopping/best-checkpoint selection uses), but never saved the final
+    number anywhere durable, so it only ever existed in wandb (if logged) or
+    was lost once the job finished. One row per hub_model_id (falling back to
+    checkpoint+output_dir if no hub id was given); reruns overwrite their own
+    row. Skipped for CV-mode runs (config.holdout_fold is not None) — that
+    in-training eval is only a proxy split for early stopping, not the honest
+    number (see scripts/evals/eval_cv.py for that)."""
+    key = config.hub_model_id or f"{config.checkpoint}->{config.output_dir}"
+    row = {
+        "key":           key,
+        "checkpoint":    config.checkpoint,
+        "hub_model_id":  config.hub_model_id,
+        "annot_file":    config.annot_file,
+        "epochs":        config.epochs,
+        "learning_rate": config.learning_rate,
+        "macro_f1":      metrics.get("eval_macro_f1"),
+        **{f"{name}_f1": metrics.get(f"eval_{name}_f1") for name in LABEL_NAMES},
+    }
+    os.makedirs(os.path.dirname(RESULTS_FILE), exist_ok=True)
+    if os.path.exists(RESULTS_FILE):
+        df = pd.read_parquet(RESULTS_FILE)
+        df = df[df["key"] != key]
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    else:
+        df = pd.DataFrame([row])
+    df.to_parquet(RESULTS_FILE, index=False)
+    print(f"[calibrate] final macro_f1={row['macro_f1']:.4f} (vs. fixed gold test set) — saved → {RESULTS_FILE}")
+
+
 def calibrate(config: CalibrateConfig) -> str:
     os.makedirs(config.output_dir, exist_ok=True)
 
@@ -234,6 +267,10 @@ def calibrate(config: CalibrateConfig) -> str:
     tokenizer.save_pretrained(config.output_dir)
     trainer.save_model(config.output_dir)
     print(f"[calibrate] saved → {config.output_dir}")
+
+    if config.holdout_fold is None:
+        final_metrics = trainer.evaluate()
+        _save_metrics(config, final_metrics)
 
     if config.hub_model_id:
         trainer.push_to_hub()
