@@ -95,6 +95,13 @@ def train(config: FigurativeConfig) -> str:
         n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"[train] encoder frozen — trainable params: {n_trainable:,}")
 
+    use_gradient_checkpointing = (
+        config.gradient_checkpointing and not config.freeze_encoder and model.supports_gradient_checkpointing
+    )
+    if config.gradient_checkpointing and not config.freeze_encoder and not model.supports_gradient_checkpointing:
+        print(f"[train] {model.__class__.__name__} does not support gradient checkpointing — disabling it "
+              f"(e.g. XLMForSequenceClassification/FacebookAI/xlm-mlm-100-1280)")
+
     train_ds, eval_ds = build_datasets(tokenizer, config)
     weights = class_weights_from(train_ds) if config.class_weights else None
 
@@ -115,7 +122,7 @@ def train(config: FigurativeConfig) -> str:
         greater_is_better=True,
         logging_steps=100,
         report_to="wandb" if config.wandb_project else "none",
-        gradient_checkpointing=config.gradient_checkpointing and not config.freeze_encoder,
+        gradient_checkpointing=use_gradient_checkpointing,
         eval_accumulation_steps=8,
         **get_precision_kwargs(),
         **({"push_to_hub": True, "hub_model_id": config.hub_model_id} if config.hub_model_id else {}),
