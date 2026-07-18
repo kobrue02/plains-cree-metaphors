@@ -19,6 +19,7 @@ Sources
 """
 
 from __future__ import annotations
+import random
 from collections import defaultdict
 
 import pandas as pd
@@ -47,14 +48,21 @@ def resolve_use_fast(checkpoint: str) -> bool:
 
 # ── raw loaders ───────────────────────────────────────────────────────────────
 
-def _load_vua20_sentences(split: str) -> list[dict]:
+def _load_vua20_sentences(split: str, min_metaphor_tokens: int = 2) -> list[dict]:
+    """min_metaphor_tokens=2, not VUA20's original "any single token" rule —
+    an isolated metaphorical token is more likely a token-level annotation
+    artifact than a sentence a person would actually judge as metaphorical;
+    requiring at least two shows sustained metaphorical use instead. This
+    (plus the metaphor-count cap in build_datasets()) addresses the teacher
+    over-predicting metaphor, traced back to VUA20 supplying ~92% of its
+    metaphor training examples via this aggregation rule."""
     rows = load_dataset("CreativeLang/vua20_metaphor")[split]
     buckets: dict[str, list[int]] = defaultdict(list)
     for row in rows:
         buckets[row["sentence"]].append(row["label"])
     result = []
     for sentence, labels in buckets.items():
-        label = METAPHOR if any(l == 1 for l in labels) else LITERAL
+        label = METAPHOR if sum(l == 1 for l in labels) >= min_metaphor_tokens else LITERAL
         result.append({"text": sentence, "label": label})
     return result
 
@@ -141,6 +149,20 @@ def build_datasets(
     vua20_test                = _load_vua20_sentences("test")
     magpie_train, magpie_test = _load_magpie()
     flute_train,  flute_test  = _load_flute()
+
+    # Even requiring >=2 metaphor tokens, VUA20 still supplies far more
+    # metaphor examples than FLUTE's cleaner, holistically-judged ones —
+    # capping at 3x FLUTE's count keeps a strong signal without letting
+    # VUA20's token-triggered labels dominate the class (train split only;
+    # test keeps its natural distribution for an honest eval).
+    flute_metaphor_count = sum(1 for r in flute_train if r["label"] == METAPHOR)
+    vua20_metaphor = [r for r in vua20_train if r["label"] == METAPHOR]
+    vua20_literal  = [r for r in vua20_train if r["label"] == LITERAL]
+    cap = flute_metaphor_count * 3
+    if len(vua20_metaphor) > cap:
+        vua20_metaphor = random.Random(42).sample(vua20_metaphor, cap)
+        vua20_train = vua20_literal + vua20_metaphor
+        print(f"[data] VUA20 train metaphor capped to {cap:,} (3x FLUTE's {flute_metaphor_count:,})")
 
     train_records = vua20_train + magpie_train + flute_train
     test_records  = vua20_test  + magpie_test  + flute_test
