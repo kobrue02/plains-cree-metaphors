@@ -44,6 +44,7 @@ CV_CONDITIONS = [
     ("Ablation: neither",         "xlm-mlm-abl-neither"),
     ("Ablation: mono-MLM warmup", "xlm-mlm-abl-mono-mlm"),
     ("Ablation: TLM+contrastive", "xlm-mlm-abl-tlm-contrastive"),
+    ("Ablation: no InfoNCE",      "xlm-mlm-abl-no-infonce"),
     ("XLM-MLM (base pipeline)",   "xlm-mlm"),
     ("XLM-V (base pipeline)",     "xlm-v"),
     ("Glot500 (base pipeline)",     "glot500"),
@@ -53,7 +54,11 @@ CV_CONDITIONS = [
     ("mDeBERTa-v3 (base pipeline)", "mdeberta"),
     ("mDistilBERT (base pipeline)", "mdistilbert"),
     # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
-    # alpha=0.0 is "Ablation: full" above; alpha=0.1 is "Ablation: TLM+contrastive"
+    # Production TLM (and "Ablation: full") trains at alpha=0.2 by default —
+    # "Ablation: no InfoNCE" above is the true alpha=0.0 leave-one-out from
+    # Full (same CLKD hyperparameters, only alpha differs); "Ablation:
+    # TLM+contrastive" is a separate alpha=0.1 data point, not the InfoNCE
+    # on/off comparison.
     ("Contrastive α=0.05", "xlm-mlm-alpha-0p05"),
     ("Contrastive α=0.15", "xlm-mlm-alpha-0p15"),
     ("Contrastive α=0.2",  "xlm-mlm-alpha-0p2"),

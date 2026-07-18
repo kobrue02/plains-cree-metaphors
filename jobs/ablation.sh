@@ -1,6 +1,6 @@
 #!/bin/bash
-# Submit all six ablation conditions for a given base model, going straight to
-# 5-fold CV calibration (jobs/calibrate_cv.sh) rather than also producing a
+# Submit all seven ablation conditions for a given base model, going straight
+# to 5-fold CV calibration (jobs/calibrate_cv.sh) rather than also producing a
 # full-data "production" calibrated checkpoint — the paper only ever reports
 # the CV numbers (scripts/evals/eval_cv.py), so a production pass for a
 # non-final ablation arm would just burn compute and push an unused Hub
@@ -8,14 +8,18 @@
 # first, then chain the CV calibration job onto it via --dependency so it
 # doesn't start until training succeeds — no manual waiting required.
 #
-# The six conditions differ only in which checkpoint feeds calibration:
+# The conditions differ only in which checkpoint feeds calibration. All TLM
+# stages train at alpha=0.2 (production default) UNLESS noted, so each row is
+# a genuine leave-one-out from the actual released recipe, not a separately-
+# trained baseline:
 #
-#   full            TLM → CLKD → 5-fold Calibrate  (uses existing checkpoints)
+#   full            TLM(a=0.2) → CLKD → 5-fold Calibrate  (uses existing checkpoints)
 #   no_tlm          base → CLKD → 5-fold Calibrate (CLKD retrained from base model)
-#   no_clkd         TLM → 5-fold Calibrate         (calibrate from TLM output)
+#   no_clkd         TLM(a=0.2) → 5-fold Calibrate  (calibrate from TLM output)
 #   neither         base → 5-fold Calibrate        (calibrate from base model directly)
-#   mono_mlm        mono MLM → TLM → CLKD → 5-fold Calibrate
-#   tlm_contrastive TLM + InfoNCE → CLKD → 5-fold Calibrate
+#   mono_mlm        mono MLM → TLM(a=0.2) → CLKD → 5-fold Calibrate
+#   no_infonce      TLM(a=0.0) → CLKD → 5-fold Calibrate  (the true "InfoNCE on/off" LOO vs. full)
+#   tlm_contrastive TLM(a=0.1) → CLKD → 5-fold Calibrate  (separate alpha data point, not on/off)
 #
 # Usage (run from project root on the cluster):
 #   bash jobs/ablation.sh
@@ -170,6 +174,7 @@ MONO_JOB=$(submit_train "mono_mlm (Cree MLM warmup → TLM → CLKD)" \
     --base-model "$BASE_MODEL" \
     --model-id "${MODEL_ID}-abl-mono-mlm" \
     --mono-mlm \
+    --contrastive-alpha 0.2 \
     --skip-calibrate \
     --push-intermediates \
     "${CLKD_FLAGS[@]}")
@@ -201,6 +206,29 @@ run_or_print "tlm_contrastive (5-fold calibrate, waits on training job ${CONTRAS
     --base-model "$BASE_MODEL" \
     --model-id "${MODEL_ID}-abl-tlm-contrastive" \
     --calibrate-from "KonradBRG/${MODEL_ID}-abl-tlm-contrastive-plains-cree-en-clkd" \
+    --calibrate-lr 5e-6 \
+    --calibrate-epochs 15 \
+    "${DEP_ARGS[@]}"
+
+# ── Condition G: no_infonce — the true leave-one-out for InfoNCE: identical
+# to "full" (same CLKD hyperparameters) except TLM trains at alpha=0.0
+# instead of the production 0.2, isolating exactly that one variable. ──────
+NO_INFONCE_JOB=$(submit_train "no_infonce (TLM without InfoNCE, alpha=0.0 → CLKD)" \
+  --job-name=abl_no_infonce --time=08:00:00 \
+  jobs/pipeline.sh \
+    --base-model "$BASE_MODEL" \
+    --model-id "${MODEL_ID}-abl-no-infonce" \
+    --contrastive-alpha 0.0 \
+    --skip-calibrate \
+    --push-intermediates \
+    "${CLKD_FLAGS[@]}")
+DEP_ARGS=()
+[ -n "$NO_INFONCE_JOB" ] && DEP_ARGS=(--dependency "afterok:$NO_INFONCE_JOB")
+run_or_print "no_infonce (5-fold calibrate, waits on training job ${NO_INFONCE_JOB:-N/A})" \
+  bash jobs/calibrate_cv.sh \
+    --base-model "$BASE_MODEL" \
+    --model-id "${MODEL_ID}-abl-no-infonce" \
+    --calibrate-from "KonradBRG/${MODEL_ID}-abl-no-infonce-plains-cree-en-clkd" \
     --calibrate-lr 5e-6 \
     --calibrate-epochs 15 \
     "${DEP_ARGS[@]}"
