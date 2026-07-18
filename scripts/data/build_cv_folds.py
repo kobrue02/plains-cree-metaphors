@@ -1,5 +1,10 @@
 """
-Assign every annotated sentence to one of K stratified cross-validation folds, once.
+Assign every GOLD sentence (footnote_applies=True, n=228) to one of K stratified
+cross-validation folds, once. ANNOT_FILE (bloomfield_annotated.parquet) also
+contains ~1,000 additional Bloomfield sentences that were silver-labeled and
+merged into the same file for other purposes — those are filtered out here,
+since SFT/calibration must only ever fold over and train on the gold subset
+(paper Section 3.5).
 
 calibrate.py can then train with any single fold excluded (--holdout-fold), and
 scripts/evals/eval_cv.py aggregates all K folds' held-out predictions into one
@@ -44,6 +49,12 @@ def main() -> None:
 
     df = pd.read_parquet(ANNOT_FILE)
     df = df.dropna(subset=["text_cree", "label"])
+    n_before_gold = len(df)
+    df = df[df["footnote_applies"] == True].reset_index(drop=True)
+    print(f"Restricted to gold subset: {len(df):,}/{n_before_gold:,} sentences "
+          f"({ANNOT_FILE} also contains additional silver-labeled sentences that "
+          f"must not be folded/trained on — see src/figurative/calibrate.py's "
+          f"_load_gold_pool()).")
     df = df.drop_duplicates(subset=["text_cree"], keep="first").reset_index(drop=True)
     df["label"] = df["label"].str.strip().str.lower().map(
         lambda x: x if x in LABEL_NAMES else "literal"

@@ -102,15 +102,24 @@ def _to_records(df: pd.DataFrame) -> list[dict]:
     ]
 
 
-def _load_gold_test_set() -> pd.DataFrame:
-    """The fixed, footnote-verified held-out test set (n=219). Never used for
-    training outside CV mode — this is what every non-CV run is scored against."""
+def _load_gold_pool() -> pd.DataFrame:
+    """The full 228-sentence gold subset (footnote_applies=True). SFT/calibration
+    must only ever draw training data from here — config.annot_file
+    (bloomfield_annotated.parquet) also contains ~1,000 additional Bloomfield
+    sentences that were silver-labeled and merged into the same file for other
+    purposes, and those must never leak into SFT training (see paper Section
+    3.5: SFT is meant to fine-tune only on the gold-labelled dataset)."""
     df = _read_labeled(GOLD_FILE, "label")
     return df[df["footnote_applies"] == True]
 
 
 def _load_records(config: CalibrateConfig) -> list[dict]:
     df = _read_labeled(config.annot_file, config.label_col)
+
+    n_before_gold = len(df)
+    gold_texts = set(_load_gold_pool()["text_cree"])
+    df = df[df["text_cree"].isin(gold_texts)]
+    print(f"[calibrate] restricted to gold subset: {len(df):,}/{n_before_gold:,} sentences")
 
     if config.holdout_fold is not None:
         if not os.path.exists(CV_FOLDS_FILE):
@@ -123,14 +132,6 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
         df = df[~df["text_cree"].isin(held_out)]
         print(f"[calibrate] holdout_fold={config.holdout_fold} — "
               f"excluded {n_before - len(df)} sentences")
-    else:
-        test_texts = set(_load_gold_test_set()["text_cree"])
-        n_before   = len(df)
-        df = df[~df["text_cree"].isin(test_texts)]
-        excluded = n_before - len(df)
-        if excluded:
-            print(f"[calibrate] excluded {excluded} sentences that are in the "
-                  f"fixed gold test set (footnote_applies=True) from training")
 
     figurative = df[df["label"] != "literal"]
     literals   = df[df["label"] == "literal"]
@@ -144,29 +145,33 @@ def _load_records(config: CalibrateConfig) -> list[dict]:
     return records
 
 
-def _load_eval_records(config: CalibrateConfig) -> list[dict]:
-    """Eval set: the fixed gold test set by default, or an explicit override."""
-    if config.eval_file is None:
-        df = _load_gold_test_set()
-    else:
-        df = _read_labeled(config.eval_file, "label")
+def _load_eval_records(eval_file: str) -> list[dict]:
+    """Explicit --eval-file override only (rare — e.g. a smoke test). The
+    default path no longer uses a fixed gold test set here: since training
+    is restricted to the gold subset (see _load_gold_pool), there's no
+    separate non-gold pool left to reserve one from — calibrate() instead
+    carves out an internal train/eval split of the gold data it trains on,
+    same as CV mode. See scripts/evals/eval_cv.py for the honest, genuinely
+    held-out number."""
+    df = _read_labeled(eval_file, "label")
     records = _to_records(df)
-    counts = df["label"].value_counts().to_dict()
-    print(f"[calibrate] eval — {len(records)} sentences — {counts}"
-          + ("" if config.eval_file is None else f"  (eval_file={config.eval_file})"))
+    print(f"[calibrate] eval — {len(records)} sentences — {df['label'].value_counts().to_dict()}"
+          f"  (eval_file={eval_file})")
     return records
 
 
 def _save_metrics(config: CalibrateConfig, metrics: dict) -> None:
-    """Persist the final (best-checkpoint) eval against the fixed gold test
-    set — calibrate() has always computed this every epoch (it's what
-    early stopping/best-checkpoint selection uses), but never saved the final
-    number anywhere durable, so it only ever existed in wandb (if logged) or
-    was lost once the job finished. One row per hub_model_id (falling back to
-    checkpoint+output_dir if no hub id was given); reruns overwrite their own
-    row. Skipped for CV-mode runs (config.holdout_fold is not None) — that
-    in-training eval is only a proxy split for early stopping, not the honest
-    number (see scripts/evals/eval_cv.py for that)."""
+    """Persist the final (best-checkpoint) eval — calibrate() has always
+    computed this every epoch (it's what early stopping/best-checkpoint
+    selection uses), but never saved the final number anywhere durable, so it
+    only ever existed in wandb (if logged) or was lost once the job finished.
+    One row per hub_model_id (falling back to checkpoint+output_dir if no hub
+    id was given); reruns overwrite their own row. Skipped for CV-mode runs
+    (config.holdout_fold is not None) — that in-training eval is only a proxy
+    split for early stopping, not the honest number (see
+    scripts/evals/eval_cv.py for that). For non-CV/production runs this is
+    also just a proxy split of the gold data being trained on, not a genuinely
+    held-out test — see the note in calibrate()'s eval_recs branch."""
     key = config.hub_model_id or f"{config.checkpoint}->{config.output_dir}"
     row = {
         "key":           key,
@@ -196,18 +201,22 @@ def calibrate(config: CalibrateConfig) -> str:
         os.environ["WANDB_PROJECT"] = config.wandb_project
 
     train_recs = _load_records(config)
-    if config.holdout_fold is not None:
-        # CV mode: this in-training eval is only a proxy for early stopping —
-        # the honest, held-out score comes later from scripts/evals/eval_cv.py
-        # predicting on the fold this run actually excluded from training.
+    if config.eval_file is not None:
+        eval_recs = _load_eval_records(config.eval_file)
+    else:
+        # Both CV and non-CV modes: this in-training eval is only a proxy for
+        # early stopping/checkpoint selection, not the reported number — the
+        # honest, held-out score comes from scripts/evals/eval_cv.py (CV mode,
+        # predicting on the fold this run excluded) or is otherwise understood
+        # to be in-sample (non-CV/production mode, see
+        # figurative_results_table.py's own note on why it uses the CV
+        # aggregate instead of this checkpoint's own eval for the Full row).
         train_recs, eval_recs = train_test_split(
             train_recs,
             test_size=0.2,
             random_state=42,
             stratify=[r["label"] for r in train_recs],
         )
-    else:
-        eval_recs = _load_eval_records(config)
     print(f"[calibrate] train={len(train_recs)}  eval={len(eval_recs)}")
 
     tokenizer = AutoTokenizer.from_pretrained(config.checkpoint, use_fast=resolve_use_fast(config.checkpoint))
