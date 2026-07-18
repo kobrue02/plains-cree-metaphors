@@ -27,6 +27,7 @@ import re
 from dataclasses import dataclass
 
 import pandas as pd
+from sklearn.metrics import classification_report
 from sklearn.model_selection import train_test_split as _train_test_split
 import torch
 import torch.nn as nn
@@ -39,12 +40,34 @@ from transformers import (
 )
 
 from src.device import get_device
-from src.figurative.data import resolve_use_fast
+from src.figurative.calibrate import _load_gold_pool
+from src.figurative.data import LABEL_NAMES, resolve_use_fast
+from src.figurative.predict import predict_sentences
 
 try:
     import wandb as _wandb
 except ImportError:
     _wandb = None
+
+
+def _gold_metrics(model, tokenizer, gold_df: pd.DataFrame, batch_size: int, max_length: int) -> dict:
+    """Macro/per-label F1 of `model` (in its current state) against the full
+    gold set — CLKD never trains on gold or silver labels, so this is always
+    a genuine zero-shot measurement, safe to compute every epoch."""
+    was_training = model.training
+    model.eval()
+    preds = predict_sentences(gold_df["text_cree"].tolist(), model, tokenizer,
+                               batch_size=batch_size, max_length=max_length)
+    if was_training:
+        model.train()
+
+    y_true = gold_df["label"].tolist()
+    y_pred = [p["label"] for p in preds]
+    report = classification_report(y_true, y_pred, labels=LABEL_NAMES, output_dict=True, zero_division=0)
+    metrics = {"macro_f1": report["macro avg"]["f1-score"]}
+    for name in LABEL_NAMES:
+        metrics[f"{name}_f1"] = report[name]["f1-score"]
+    return metrics
 
 
 @dataclass
@@ -268,6 +291,12 @@ def _distill_clkd(config: DistillConfig) -> str:
     if _wandb and _wandb.run:
         _wandb.config.update({"corpus_size": len(df)}, allow_val_change=True)
 
+    gold_df = _load_gold_pool()
+    print(f"[distill] gold eval set: {len(gold_df):,} sentences (zero-shot, never trained on)")
+    best_gold_f1 = -1.0
+    best_state = None
+    best_epoch = None
+
     if len(df) >= 20:
         train_df, eval_df = _train_test_split(df, test_size=0.1, random_state=42)
     else:
@@ -342,17 +371,36 @@ def _distill_clkd(config: DistillConfig) -> str:
                 ).logits
                 eval_loss += _clkd_loss(t_logits, s_logits, config.temperature).item()
         eval_avg = eval_loss / len(eval_loader)
+
+        gold_metrics = _gold_metrics(student, student_tokenizer, gold_df,
+                                      batch_size=config.batch_size, max_length=config.max_length)
         student.train()
 
         print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
-              f"train_loss={avg_loss:.4f}  eval_kl={eval_avg:.4f}")
+              f"train_loss={avg_loss:.4f}  eval_kl={eval_avg:.4f}  "
+              f"gold_macro_f1={gold_metrics['macro_f1']:.4f}")
         if _wandb and _wandb.run:
             _wandb.log({
-                "train/loss_epoch": avg_loss,
-                "eval/kl_epoch":    eval_avg,
-                "epoch":            epoch + 1,
-                "train/clkd_step":  global_step,
+                "train/loss_epoch":     avg_loss,
+                "eval/kl_epoch":        eval_avg,
+                "eval/gold_macro_f1":   gold_metrics["macro_f1"],
+                **{f"eval/gold_{name}_f1": gold_metrics[f"{name}_f1"] for name in LABEL_NAMES},
+                "epoch":                epoch + 1,
+                "train/clkd_step":      global_step,
             })
+
+        if gold_metrics["macro_f1"] > best_gold_f1:
+            best_gold_f1 = gold_metrics["macro_f1"]
+            best_epoch = epoch + 1
+            best_state = {k: v.detach().cpu().clone() for k, v in student.state_dict().items()}
+
+    if best_state is not None:
+        print(f"[distill] restoring best checkpoint — epoch {best_epoch} "
+              f"(gold_macro_f1={best_gold_f1:.4f})")
+        student.load_state_dict(best_state)
+        if _wandb and _wandb.run:
+            _wandb.summary["best_epoch"] = best_epoch
+            _wandb.summary["best_gold_macro_f1"] = best_gold_f1
 
     student.save_pretrained(config.output_dir)
     student_tokenizer.save_pretrained(config.output_dir)
