@@ -48,6 +48,14 @@ TLM_HUB="KonradBRG/${MODEL_ID}-plains-cree-en-tlm"
 CLKD_CKPT="data/clkd_${MODEL_ID}"
 CLKD_HUB="KonradBRG/${MODEL_ID}-plains-cree-en-clkd"
 
+# Sweep-best CLKD hyperparameters (data/sweep_best/konradbrg-uni_FNLP_vjqf6ngx.json,
+# eval/kl_epoch=0.0575) — applied to every condition that trains a fresh CLKD
+# stage (no_tlm/mono_mlm/tlm_contrastive below). "full" doesn't retrain CLKD
+# here (it reuses whatever's already on the Hub for $MODEL_ID) — make sure
+# that checkpoint was itself produced with these same flags, or "full" and
+# the other three conditions aren't actually comparable.
+CLKD_FLAGS=(--clkd-epochs 5 --clkd-lr 2.8635565931749224e-05 --clkd-temperature 4 --freeze-layers 6)
+
 # Resolve checkpoint paths: prefer local dir, fall back to Hub. Only valid
 # for checkpoints that already exist at script-submission time (full/no_clkd/
 # neither below) — conditions that train a fresh checkpoint (no_tlm/mono_mlm/
@@ -55,6 +63,11 @@ CLKD_HUB="KonradBRG/${MODEL_ID}-plains-cree-en-clkd"
 # their training job finishes; those always target the Hub id directly,
 # guaranteed present by the time the dependent CV job starts because
 # --push-intermediates makes the training job push before it exits.
+#
+# This is a genuine leave-one-out ablation over the PRODUCTION recipe — i.e.
+# no_clkd/neither deliberately reuse the same alpha=0.2-InfoNCE TLM checkpoint
+# "full" uses, isolating "what does removing CLKD do to our actual released
+# TLM," not a separately-trained alpha=0.0 vanilla baseline.
 if [ -d "$TLM_CKPT" ]; then
   TLM_RESOLVED="$TLM_CKPT"
 else
@@ -114,7 +127,8 @@ NO_TLM_JOB=$(submit_train "no_tlm (CLKD from base model)" \
     --skip-tlm \
     --clkd-from "$BASE_MODEL" \
     --skip-calibrate \
-    --push-intermediates)
+    --push-intermediates \
+    "${CLKD_FLAGS[@]}")
 DEP_ARGS=()
 [ -n "$NO_TLM_JOB" ] && DEP_ARGS=(--dependency "afterok:$NO_TLM_JOB")
 run_or_print "no_tlm (5-fold calibrate, waits on training job ${NO_TLM_JOB:-N/A})" \
@@ -126,7 +140,10 @@ run_or_print "no_tlm (5-fold calibrate, waits on training job ${NO_TLM_JOB:-N/A}
     --calibrate-epochs 15 \
     "${DEP_ARGS[@]}"
 
-# ── Condition C: no_clkd — reuses the existing TLM checkpoint directly. ─────
+# ── Condition C: no_clkd — reuses the existing (production, alpha=0.2) TLM
+# checkpoint directly, same one "full" uses. Leave-one-out: this isolates
+# what CLKD adds on top of the actual released TLM, not a separately-trained
+# vanilla baseline. ──────────────────────────────────────────────────────────
 run_or_print "no_clkd (5-fold calibrate from TLM checkpoint)" \
   bash jobs/calibrate_cv.sh \
     --base-model "$BASE_MODEL" \
@@ -154,7 +171,8 @@ MONO_JOB=$(submit_train "mono_mlm (Cree MLM warmup → TLM → CLKD)" \
     --model-id "${MODEL_ID}-abl-mono-mlm" \
     --mono-mlm \
     --skip-calibrate \
-    --push-intermediates)
+    --push-intermediates \
+    "${CLKD_FLAGS[@]}")
 DEP_ARGS=()
 [ -n "$MONO_JOB" ] && DEP_ARGS=(--dependency "afterok:$MONO_JOB")
 run_or_print "mono_mlm (5-fold calibrate, waits on training job ${MONO_JOB:-N/A})" \
@@ -174,7 +192,8 @@ CONTRASTIVE_JOB=$(submit_train "tlm_contrastive (TLM with InfoNCE alignment → 
     --model-id "${MODEL_ID}-abl-tlm-contrastive" \
     --contrastive-alpha 0.1 \
     --skip-calibrate \
-    --push-intermediates)
+    --push-intermediates \
+    "${CLKD_FLAGS[@]}")
 DEP_ARGS=()
 [ -n "$CONTRASTIVE_JOB" ] && DEP_ARGS=(--dependency "afterok:$CONTRASTIVE_JOB")
 run_or_print "tlm_contrastive (5-fold calibrate, waits on training job ${CONTRASTIVE_JOB:-N/A})" \

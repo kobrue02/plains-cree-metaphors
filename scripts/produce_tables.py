@@ -78,6 +78,7 @@ def main() -> None:
         results.append(run_step(
             "2. figurative_results_table.py (Table 3)",
             [py, "scripts/evals/figurative_results_table.py", "--gold-footnoted-only",
+             "--model-id",            "xlm-mlm-abl-full",  # matches jobs/ablation.sh's Full-condition fold naming, not the "xlm-mlm" default
              "--baseline-checkpoint", args.baseline_checkpoint,
              "--tlm-checkpoint",      args.tlm_checkpoint,
              "--clkd-checkpoint",     args.clkd_checkpoint],
