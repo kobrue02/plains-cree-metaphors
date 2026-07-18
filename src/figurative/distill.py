@@ -376,23 +376,24 @@ def _distill_clkd(config: DistillConfig) -> str:
                                       batch_size=config.batch_size, max_length=config.max_length)
         student.train()
 
-        print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
-              f"train_loss={avg_loss:.4f}  eval_kl={eval_avg:.4f}  "
-              f"gold_macro_f1={gold_metrics['macro_f1']:.4f}")
-        if _wandb and _wandb.run:
-            _wandb.log({
-                "train/loss_epoch":     avg_loss,
-                "eval/kl_epoch":        eval_avg,
-                "eval/gold_macro_f1":   gold_metrics["macro_f1"],
-                **{f"eval/gold_{name}_f1": gold_metrics[f"{name}_f1"] for name in LABEL_NAMES},
-                "epoch":                epoch + 1,
-                "train/clkd_step":      global_step,
-            })
-
         if gold_metrics["macro_f1"] > best_gold_f1:
             best_gold_f1 = gold_metrics["macro_f1"]
             best_epoch = epoch + 1
             best_state = {k: v.detach().cpu().clone() for k, v in student.state_dict().items()}
+
+        print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
+              f"train_loss={avg_loss:.4f}  eval_kl={eval_avg:.4f}  "
+              f"gold_macro_f1={gold_metrics['macro_f1']:.4f}  best_so_far={best_gold_f1:.4f}")
+        if _wandb and _wandb.run:
+            _wandb.log({
+                "train/loss_epoch":         avg_loss,
+                "eval/kl_epoch":            eval_avg,
+                "eval/gold_macro_f1":       gold_metrics["macro_f1"],
+                "eval/best_gold_macro_f1":  best_gold_f1,
+                **{f"eval/gold_{name}_f1": gold_metrics[f"{name}_f1"] for name in LABEL_NAMES},
+                "epoch":                    epoch + 1,
+                "train/clkd_step":          global_step,
+            })
 
     if best_state is not None:
         print(f"[distill] restoring best checkpoint — epoch {best_epoch} "

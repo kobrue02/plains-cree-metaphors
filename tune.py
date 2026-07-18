@@ -6,10 +6,12 @@ stage-appropriate metric to wandb so the sweep controller can guide
 the next trial via Bayesian optimisation.
 
 Metrics optimised per stage:
-  tlm       → eval/loss       (minimize)  — TLM held-out MLM/TLM loss
-  clkd      → eval/kl_epoch   (minimize)  — held-out KL on 10% corpus split
-  calibrate → eval/macro_f1   (maximize)  — macro F1 on held-out annotation split
-  pipeline  → eval/macro_f1   (maximize)  — joint CLKD+Calibrate sweep (recommended)
+  tlm       → eval/loss                  (minimize)  — TLM held-out MLM/TLM loss
+  clkd      → eval/best_gold_macro_f1    (maximize)  — running-best zero-shot
+                                                        macro F1 on the 228-sentence
+                                                        gold subset (see sweeps/clkd.yaml)
+  calibrate → eval/macro_f1              (maximize)  — macro F1 on held-out annotation split
+  pipeline  → eval/macro_f1              (maximize)  — joint CLKD+Calibrate sweep (recommended)
 
 Usage:
   # 1. Create a sweep (once per stage):

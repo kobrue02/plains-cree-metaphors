@@ -57,7 +57,7 @@ STAGE_FLAGS = {
 
 METRIC_FALLBACK = {
     "calibrate": "eval/macro_f1",
-    "clkd":      "eval/kl_epoch",
+    "clkd":      "eval/best_gold_macro_f1",
     "tlm":       "eval/loss",
     "pipeline":  "eval/macro_f1",
 }
@@ -94,7 +94,7 @@ def fetch_best(sweep_path: str) -> dict:
 
     stage = _infer_stage(runs[0])
     metric_key = METRIC_FALLBACK.get(stage, "eval/macro_f1")
-    higher_is_better = stage in ("calibrate", "pipeline")
+    higher_is_better = stage in ("calibrate", "pipeline", "clkd")
 
     def score(run):
         val = run.summary.get(metric_key)

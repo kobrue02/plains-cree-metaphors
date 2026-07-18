@@ -1,5 +1,12 @@
-# Sweep for CLKD stage — optimises held-out KL divergence (10% corpus split)
-# Metric: eval/kl_epoch (minimize)
+# Sweep for CLKD stage — optimises zero-shot macro F1 on the 228-sentence
+# gold subset (CLKD never trains on gold/silver labels, so this is a genuine
+# held-out signal every epoch, not a KL-divergence proxy).
+# Metric: eval/best_gold_macro_f1 (maximize) — the running best-epoch value
+# logged every epoch by src/figurative/distill.py, not the raw per-epoch
+# eval/gold_macro_f1 — using the raw value would score a trial on whatever
+# its LAST epoch happened to log, penalizing configs that peak early then
+# overfit, exactly the case distill.py's best-checkpoint restore is meant to
+# handle.
 #
 # The TLM checkpoint is fixed — set --tlm-ckpt to the best TLM run's output
 # or a Hub model before running this sweep.
@@ -11,8 +18,8 @@ project: FNLP
 program: tune.py
 method: bayes
 metric:
-  name: eval/kl_epoch
-  goal: minimize
+  name: eval/best_gold_macro_f1
+  goal: maximize
 early_terminate:
   type: hyperband
   min_iter: 3
