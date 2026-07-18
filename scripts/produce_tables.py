@@ -26,7 +26,8 @@ Usage:
       --baseline-checkpoint KonradBRG/xlm-mlm-100-1280-figurative-baseline \
       --tlm-checkpoint      KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative \
       --clkd-checkpoint     KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full \
-      --tlm-eval-infonce-checkpoint KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-tlm
+      --tlm-eval-no-infonce-checkpoint KonradBRG/xlm-mlm-abl-no-clkd-plains-cree-en-tlm \
+      --tlm-eval-infonce-checkpoint    KonradBRG/xlm-mlm-plains-cree-en-tlm
 """
 
 from __future__ import annotations
@@ -56,13 +57,19 @@ def main() -> None:
     p.add_argument("--clkd-checkpoint", default="KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full",
                    help="'+TLM+CLKD' row checkpoint for Table 3")
 
+    p.add_argument("--tlm-eval-no-infonce-checkpoint",
+                   default="KonradBRG/xlm-mlm-abl-no-clkd-plains-cree-en-tlm",
+                   help="Checkpoint for tab:tlm-eval's '+TLM' column (no InfoNCE, alpha=0.0). "
+                        "Defaults to the alpha=0.0 TLM checkpoint trained for the ablation "
+                        "table's no_infonce condition — NOT tlm_eval_table.py's own default, "
+                        "which points at the production (alpha=0.2) checkpoint.")
     p.add_argument("--tlm-eval-infonce-checkpoint",
-                   default="KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-tlm",
-                   help="Checkpoint for tab:tlm-eval's '+TLM+InfoNCE' column. Defaults to the "
-                        "ablation's alpha=0.1 contrastive checkpoint, since the production "
-                        "'+TLM' checkpoint now trains with InfoNCE (alpha=0.2) baked in by "
-                        "default and is no longer a distinct 'no InfoNCE' comparison point — "
-                        "see the module docstring in scripts/evaluate/tlm_eval_table.py.")
+                   default="KonradBRG/xlm-mlm-plains-cree-en-tlm",
+                   help="Checkpoint for tab:tlm-eval's '+TLM+InfoNCE' column (alpha=0.2). "
+                        "Defaults to the actual production TLM checkpoint, matching the "
+                        "'-InfoNCE only' decision for tab:ablation-loo — the ablation's "
+                        "alpha=0.1 tlm_contrastive checkpoint is a separate data point, not "
+                        "used here.")
 
     args = p.parse_args()
     py = sys.executable
@@ -88,6 +95,7 @@ def main() -> None:
         results.append(run_step(
             "3. tlm_eval_table.py (tab:tlm-eval)",
             [py, "scripts/evaluate/tlm_eval_table.py",
+             "--model", f"+TLM={args.tlm_eval_no_infonce_checkpoint}",
              "--model", f"+TLM+InfoNCE={args.tlm_eval_infonce_checkpoint}"],
         ))
 
