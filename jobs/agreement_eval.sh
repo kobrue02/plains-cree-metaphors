@@ -39,20 +39,22 @@ uv sync
 mkdir -p logs
 
 CHECKPOINT="KonradBRG/xlm-mlm-plains-cree-en-figurative"
+SILVER_FILE="data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet"
 if [ "$1" = "--checkpoint" ]; then
   CHECKPOINT="$2"
   shift 2
 fi
 
 echo "=== predict_pool.py (checkpoint=$CHECKPOINT) ==="
-python3 scripts/annotate/predict_pool.py --checkpoint "$CHECKPOINT" "$@"
+python3 scripts/annotate/predict_pool.py --checkpoint "$CHECKPOINT" \
+    --restrict-to "$SILVER_FILE" "$@"
 if [ $? -ne 0 ]; then
   echo "predict_pool.py failed." && exit 1
 fi
 
 echo "=== deepseek_agreement_eval.py ==="
 python3 scripts/annotate/deepseek_agreement_eval.py \
-    --deepseek-file data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet
+    --deepseek-file "$SILVER_FILE"
 if [ $? -ne 0 ]; then
   echo "deepseek_agreement_eval.py failed." && exit 1
 fi
