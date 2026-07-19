@@ -10,6 +10,7 @@ from src.figurative import config as figurative_config
 from src.figurative.train import train as figurative_train_fn
 from src.figurative.distill import distill as figurative_distill_fn, DistillConfig
 from src.figurative.calibrate import calibrate as figurative_calibrate_fn, CalibrateConfig
+from src.figurative.silver_sft import train_on_silver as train_on_silver_fn, SilverSFTConfig
 from src.figurative.predict import (
     load_model as figurative_load_model,
     predict_sentences,
@@ -199,6 +200,38 @@ def calibrate(
         holdout_fold=holdout_fold,
     )
     return figurative_calibrate_fn(cfg)
+
+
+def train_silver(
+    checkpoint:    str,
+    silver_file:   str        = "data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet",
+    label_col:     str        = "deepseek_label",
+    output_dir:    str        = "data/figurative/silver_sft",
+    hub_model_id:  str | None = None,
+    wandb_project: str | None = None,
+    epochs:        int        = 5,
+    batch_size:    int        = 16,
+    learning_rate: float      = 2e-5,
+    max_length:    int        = 128,
+    freeze_n_layers: int      = 0,
+    hierarchical:  bool       = False,
+) -> str:
+    """Fine-tune a TLM-adapted encoder on LLM silver labels; eval on the fixed gold set."""
+    cfg = SilverSFTConfig(
+        checkpoint=checkpoint,
+        silver_file=silver_file,
+        label_col=label_col,
+        output_dir=output_dir,
+        hub_model_id=hub_model_id,
+        wandb_project=wandb_project,
+        epochs=epochs,
+        batch_size=batch_size,
+        learning_rate=learning_rate,
+        max_length=max_length,
+        freeze_n_layers=freeze_n_layers,
+        hierarchical=hierarchical,
+    )
+    return train_on_silver_fn(cfg)
 
 
 def predict_figurative(

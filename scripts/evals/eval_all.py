@@ -108,6 +108,10 @@ _VALIDATION_MODELS = [
     ("Contrastive α=0.5",  "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
     ("Contrastive α=0.75", "KonradBRG/xlm-mlm-alpha-0p75-plains-cree-en-calibrated"),
     ("Contrastive α=1.0",  "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
+    # ── ceiling baseline: the CLKD teacher scored on the English glosses rather
+    # than the Cree text — bounds how much of the students' error is inherited
+    # teacher weakness (idiom/metaphor/simile) vs. added cross-lingual-transfer loss ──
+    ("Teacher-on-glosses (English ceiling)", "KonradBRG/deberta-v3-base-figurative", "text_en"),
 ]
 
 # alpha -> (label in _VALIDATION_MODELS, calibrated repo_id) — used by
@@ -142,15 +146,17 @@ def task_validation(model: str | None = None) -> None:
         sys.exit(f"No model named {model!r}. Choices: {[c[0] for c in _VALIDATION_MODELS]}")
 
     def evaluate(df: pd.DataFrame, subset_name: str) -> list[dict]:
-        cree_texts = df["text_cree"].tolist()
-        y_true     = df["label"].tolist()
+        y_true = df["label"].tolist()
 
         rows = []
-        for name, ckpt in models:
+        for entry in models:
+            name, ckpt = entry[0], entry[1]
+            text_col = entry[2] if len(entry) > 2 else "text_cree"
+            texts = df[text_col].tolist()
             print(f"\n{'='*60}\n  {name}  [{subset_name}]")
             try:
                 model, tok = load_model(ckpt)
-                preds  = predict_sentences(cree_texts, model, tok)
+                preds  = predict_sentences(texts, model, tok)
                 y_pred = [p["label"] for p in preds]
                 del model
                 torch.cuda.empty_cache()

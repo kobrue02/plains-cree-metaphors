@@ -33,6 +33,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+from tqdm.auto import tqdm
 from transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
@@ -330,7 +331,8 @@ def _distill_clkd(config: DistillConfig) -> str:
     global_step = 0
     for epoch in range(config.epochs):
         epoch_loss = 0.0
-        for batch in loader:
+        pbar = tqdm(loader, desc=f"[distill] epoch {epoch + 1}/{config.epochs}", leave=False)
+        for batch in pbar:
             with torch.no_grad():
                 teacher_logits = teacher(
                     input_ids=batch["teacher_input_ids"].to(device),
@@ -350,6 +352,7 @@ def _distill_clkd(config: DistillConfig) -> str:
             scheduler.step()
             epoch_loss += loss.item()
             global_step += 1
+            pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{scheduler.get_last_lr()[0]:.2e}")
             if _wandb and _wandb.run:
                 _wandb.log({"train/loss_step": loss.item(),
                             "train/lr": scheduler.get_last_lr()[0],
@@ -468,7 +471,8 @@ def _distill_self(config: DistillConfig) -> str:
 
     for epoch in range(config.epochs):
         epoch_loss = 0.0
-        for batch in loader:
+        pbar = tqdm(loader, desc=f"[distill] epoch {epoch + 1}/{config.epochs}", leave=False)
+        for batch in pbar:
             cree_kwargs = {
                 "input_ids":            batch["cree_input_ids"].to(device),
                 "attention_mask":       batch["cree_attention_mask"].to(device),
@@ -501,6 +505,7 @@ def _distill_self(config: DistillConfig) -> str:
             optimizer.step()
             scheduler.step()
             epoch_loss += loss.item()
+            pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{scheduler.get_last_lr()[0]:.2e}")
 
         print(f"[distill] epoch {epoch + 1}/{config.epochs}  "
               f"loss={epoch_loss / len(loader):.4f}")

@@ -14,8 +14,11 @@ Sources
   VUA20  — token-level → aggregated to sentence level (any metaphor ⇒ class 2)
   MAGPIE — sentence-level idiom detection (figurative ⇒ class 1)
   FLUTE  — NLI dataset; we use the *hypothesis* of Entailment rows for
-           Idiom/Metaphor/Simile types only.  Sarcasm and CreativeParaphrase
-           are excluded (sarcasm is absent from Bloomfield annotations).
+           Idiom/Metaphor/Simile types only, plus each such row's *premise*
+           as a literal example (kept in the same train/test split as its
+           hypothesis to avoid the paraphrase pair leaking across splits).
+           Sarcasm and CreativeParaphrase are excluded (sarcasm is absent
+           from Bloomfield annotations).
 """
 
 from __future__ import annotations
@@ -68,24 +71,35 @@ def _load_vua20_sentences(split: str, min_metaphor_tokens: int = 2) -> list[dict
 
 
 def _load_flute() -> tuple[list[dict], list[dict]]:
-    """Extract figurative sentences from FLUTE; uses hypothesis of Entailment rows only (Contradiction rows misuse the figure)."""
+    """Extract figurative sentences from FLUTE; uses hypothesis of Entailment rows only
+    (Contradiction rows misuse the figure). Each such row's premise is the figure's literal
+    counterpart, so we add it as a literal example — kept in the same split as its hypothesis
+    to avoid the paraphrase pair leaking across train/test."""
     _type_map = {"Idiom": IDIOM, "Metaphor": METAPHOR, "Simile": SIMILE}
     ds = load_dataset("ColumbiaNLP/FLUTE")["train"]
-    records = []
+    pairs = []
     for row in ds:
         if row["label"] != "Entailment":
             continue
         label = _type_map.get(row["type"])
         if label is None:
             continue
-        records.append({"text": row["hypothesis"], "label": label})
-    train_data, test_data = train_test_split(
-        records,
+        pairs.append({"hypothesis": row["hypothesis"], "premise": row["premise"], "label": label})
+    train_pairs, test_pairs = train_test_split(
+        pairs,
         test_size=0.2,
         random_state=42,
-        stratify=[r["label"] for r in records],
+        stratify=[p["label"] for p in pairs],
     )
-    return train_data, test_data
+
+    def _to_records(pair_split: list[dict]) -> list[dict]:
+        records = []
+        for p in pair_split:
+            records.append({"text": p["hypothesis"], "label": p["label"]})
+            records.append({"text": p["premise"], "label": LITERAL})
+        return records
+
+    return _to_records(train_pairs), _to_records(test_pairs)
 
 
 def _load_magpie() -> tuple[list[dict], list[dict]]:
