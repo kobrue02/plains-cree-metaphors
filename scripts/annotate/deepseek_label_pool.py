@@ -30,6 +30,8 @@ from __future__ import annotations
 import argparse, json, os, sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from tqdm import tqdm
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from scripts.annotate._pool_utils import load_pool, POOL_FILE, EXCLUDE_SOURCE
@@ -133,14 +135,14 @@ def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_ann
     if todo.empty:
         return cache
 
-    done = 0
     with open(cache_path, "a", encoding="utf-8") as cache_f, \
          ThreadPoolExecutor(max_workers=workers) as pool_exec:
         futures = {
             pool_exec.submit(_annotate_one, row["text_cree"], row["text_en"], annotate_fn): row["text_cree"]
             for _, row in todo.iterrows()
         }
-        for future in as_completed(futures):
+        pbar = tqdm(as_completed(futures), total=len(futures), desc="annotating", unit="sentence")
+        for future in pbar:
             text_cree = futures[future]
             try:
                 _, label, reasoning = future.result()
@@ -149,8 +151,7 @@ def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_ann
                 # a fallback label here, or the resume logic would treat this
                 # sentence as done and never retry it. Just skip; it stays
                 # "to do" and gets picked up on the next run.
-                print(f"  [annotate] error on {text_cree[:40]!r}: {exc} — will retry next run")
-                done += 1
+                pbar.write(f"  [annotate] error on {text_cree[:40]!r}: {exc} — will retry next run")
                 continue
 
             cache[text_cree] = {"label": label, "reasoning": reasoning}
@@ -159,10 +160,6 @@ def annotate_pool(pool, cache_path: str, workers: int, annotate_fn=_deepseek_ann
                 "prompt_version": version,
             }) + "\n")
             cache_f.flush()
-
-            done += 1
-            if done % 50 == 0:
-                print(f"  [{done:,}/{len(todo):,}] annotated")
 
     return cache
 

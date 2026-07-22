@@ -112,6 +112,9 @@ _VALIDATION_MODELS = [
     # than the Cree text — bounds how much of the students' error is inherited
     # teacher weakness (idiom/metaphor/simile) vs. added cross-lingual-transfer loss ──
     ("Teacher-on-glosses (English ceiling)", "KonradBRG/deberta-v3-base-figurative", "text_en"),
+    # ── TLM+CLKD vs. TLM+Silver-SFT comparison (Sections 3/4 of the paper) ──
+    ("TLM+CLKD",                 "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
+    ("TLM+Silver-SFT (hierarchical)", "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-hierarchical"),
 ]
 
 # alpha -> (label in _VALIDATION_MODELS, calibrated repo_id) — used by

@@ -4,8 +4,12 @@ Sentence-level figurative language prediction (4 classes: literal/idiom/metaphor
 
 from __future__ import annotations
 
+import json
+import os
+
 import torch
 import pandas as pd
+from huggingface_hub import hf_hub_download
 from tqdm import tqdm
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
@@ -13,13 +17,28 @@ from src.device import get_device
 from src.figurative.data import LABEL_NAMES, resolve_use_fast
 
 
+def _model_type(checkpoint: str) -> str | None:
+    """Read config.json's `model_type` without going through AutoConfig, since
+    custom architectures like HierarchicalFigurativeModel aren't registered
+    with the Auto* mapping."""
+    config_path = os.path.join(checkpoint, "config.json") if os.path.isdir(checkpoint) else None
+    if config_path is None or not os.path.exists(config_path):
+        config_path = hf_hub_download(checkpoint, "config.json")
+    with open(config_path) as f:
+        return json.load(f).get("model_type")
+
+
 def load_model(
     checkpoint: str,
-) -> tuple[AutoModelForSequenceClassification, AutoTokenizer]:
+):
     tokenizer = AutoTokenizer.from_pretrained(checkpoint, use_fast=resolve_use_fast(checkpoint))
-    model = AutoModelForSequenceClassification.from_pretrained(
-        checkpoint, torch_dtype=torch.float32,
-    )
+    if _model_type(checkpoint) == "hierarchical_figurative":
+        from src.figurative.hierarchical import HierarchicalFigurativeModel
+        model = HierarchicalFigurativeModel.from_pretrained(checkpoint, torch_dtype=torch.float32)
+    else:
+        model = AutoModelForSequenceClassification.from_pretrained(
+            checkpoint, torch_dtype=torch.float32,
+        )
     model.eval()
     model.to(get_device())
     return model, tokenizer

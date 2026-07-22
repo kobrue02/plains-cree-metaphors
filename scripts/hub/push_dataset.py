@@ -6,27 +6,17 @@ Splits:
            footnote commentary directly applies (footnote_applies == True), plus a
            handful of supplementary idiom/metaphor examples from external sources
            (see the `source_file` column). This is the closest thing to a
-           human-verified label this project has, and is never touched by --checkpoint.
-  silver — everything else: (a) the remaining Bloomfield sentences whose label was
-           inferred from paragraph context rather than a directly-applicable footnote,
-           and (b) the un-footnoted majority of the corpus, labeled via DeepSeek +
-           itwêwina dictionary evidence (data/figurative/deepseek_labels.parquet).
-           The DeepSeek/context-inferred label is always the published `label` column.
-           If --checkpoint is given, the classifier's own prediction on the same
-           sentences is added as `classifier_label`/`classifier_confidence`/`prob_*`,
-           plus an `agree_with_classifier` flag — this is left null/False if no
-           checkpoint is given, e.g. before the classifier has been trained.
-
---checkpoint should be whichever model the ablation study picks as best — there's no
-built-in default since that's still being decided. It's optional: the silver split can
-be published from DeepSeek's labels alone, with the classifier-agreement columns added
-in a later run once a checkpoint exists.
+           human-verified label this project has.
+  silver — everything else in the corpus (Bloomfield 1934, Bloomfield 1930, and EdTeKLA;
+           Ojibwe is excluded as a different language): each sentence's English gloss is
+           read against itwêwina dictionary entries for its content words by an LLM
+           (data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet). Labeled by two
+           models across two passes — see the `model` column.
 
 Usage:
-  python scripts/hub/push_dataset.py --dry-run                       # gold + silver, no agreement columns yet
-  python scripts/hub/push_dataset.py --checkpoint KonradBRG/xlm-mlm-plains-cree-en-calibrated
-  python scripts/hub/push_dataset.py --checkpoint <best-ablation-checkpoint> --dry-run
-  python scripts/hub/push_dataset.py --checkpoint ... --out-dir data/figurative/dataset
+  python scripts/hub/push_dataset.py --dry-run
+  python scripts/hub/push_dataset.py
+  python scripts/hub/push_dataset.py --out-dir data/figurative/dataset
 
 Requires: huggingface-cli login (or HF_TOKEN env var set), unless --dry-run.
 """
@@ -38,11 +28,10 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import pandas as pd
 
-from src.figurative.predict import load_model, predict_sentences
 from src.figurative.data import LABEL_NAMES
 
 ANNOT_FILE  = "data/figurative/bloomfield_annotated.parquet"
-SILVER_FILE = "data/figurative/deepseek_labels.parquet"
+SILVER_FILE = "data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet"
 REPO_ID     = "KonradBRG/plains-cree-figurative"
 
 GOLD_COLUMNS = [
@@ -51,10 +40,7 @@ GOLD_COLUMNS = [
 ]
 SILVER_COLUMNS = [
     "paragraph_id", "sentence_id", "text_cree", "text_en", "label",
-    "annotation_source", "rationale",
-    "classifier_label", "classifier_confidence",
-    "prob_literal", "prob_idiom", "prob_metaphor", "prob_simile",
-    "agree_with_classifier", "model_checkpoint",
+    "model", "rationale",
 ]
 
 
@@ -64,7 +50,29 @@ def build_gold() -> pd.DataFrame:
     return gold[GOLD_COLUMNS].reset_index(drop=True)
 
 
-def build_card(repo_id: str, checkpoint: str | None, gold: pd.DataFrame, silver: pd.DataFrame) -> "DatasetCard":
+def build_silver(gold: pd.DataFrame) -> pd.DataFrame:
+    # Every non-gold Cree sentence (Bloomfield 1934/1930 + EdTeKLA) is labeled by
+    # the same dictionary-grounded LLM procedure — see the `model` column for
+    # which of the two annotation passes produced each row.
+    silver = pd.read_parquet(SILVER_FILE)[
+        ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label", "model", "reasoning"]
+    ].rename(columns={"deepseek_label": "label", "reasoning": "rationale"})
+
+    # safety net: silver should never overlap gold, but check anyway.
+    gold_keys = set(zip(gold["paragraph_id"], gold["sentence_id"]))
+    keep = [
+        (pid, sid) not in gold_keys
+        for pid, sid in zip(silver["paragraph_id"], silver["sentence_id"])
+    ]
+    n_dropped = len(silver) - sum(keep)
+    if n_dropped:
+        print(f"  [warn] dropped {n_dropped} silver rows that overlap gold — check upstream exclusion logic")
+    silver = silver[keep].reset_index(drop=True)
+
+    return silver[SILVER_COLUMNS]
+
+
+def build_card(repo_id: str, gold: pd.DataFrame, silver: pd.DataFrame) -> "DatasetCard":
     from huggingface_hub import DatasetCard, DatasetCardData
 
     def dist(df: pd.DataFrame) -> str:
@@ -78,25 +86,17 @@ def build_card(repo_id: str, checkpoint: str | None, gold: pd.DataFrame, silver:
         multilinguality       = "translation",
         task_categories       = ["text-classification"],
         pretty_name           = "Plains Cree Figurative Language Detection",
+        # gold/silver have different schemas, so they're pushed as separate
+        # configs (see main()) rather than splits of one config — this section
+        # is what tells load_dataset(repo_id, "gold"/"silver") where to look.
+        # Must be declared explicitly: pushing this card overwrites the
+        # auto-generated README from Dataset.push_to_hub(), which would
+        # otherwise carry this same section automatically.
+        configs=[
+            {"config_name": "gold",   "data_files": [{"split": "gold",   "path": "gold/gold-*.parquet"}]},
+            {"config_name": "silver", "data_files": [{"split": "silver", "path": "silver/silver-*.parquet"}]},
+        ],
     )
-
-    if checkpoint:
-        agree_rate = silver["agree_with_classifier"].mean()
-        classifier_note = (
-            f"[`{checkpoint}`](https://huggingface.co/{checkpoint}) — a classifier trained via "
-            f"cross-lingual knowledge distillation (CLKD) from an English figurative-language "
-            f"teacher, then calibrated on `gold` — was additionally run on every silver sentence. "
-            f"It agrees with the DeepSeek/context-inferred label {agree_rate:.1%} of the time "
-            f"(`agree_with_classifier`); disagreement doesn't mean a sentence is unusable, only "
-            f"that the two independent label sources diverge on it, which is itself informative — "
-            f"we deliberately did not drop these rows (see Limitations)."
-        )
-    else:
-        classifier_note = (
-            "No classifier has been run against this split yet, so `classifier_label`, "
-            "`classifier_confidence`, `prob_*`, and `agree_with_classifier` are all null. "
-            "A later release will add these once a trained classifier is available."
-        )
 
     content = f"""\
 ---
@@ -120,7 +120,7 @@ two different provenances rather than a conventional train/test split:
 Sentences whose figurative-language label is directly supported by Bloomfield's own footnote
 commentary, plus a small number of supplementary idiom/metaphor examples from other sources
 (distinguished via `source_file`). This is the closest thing to a human-verified label in this
-dataset — never touched by any classifier.
+dataset.
 
 **Label distribution:**
 {dist(gold)}
@@ -130,21 +130,22 @@ dataset — never touched by any classifier.
 
 ### `silver` ({len(silver):,} sentences)
 
-Everything else, from two sources distinguished via `annotation_source`: (a) Bloomfield
-sentences whose label was inferred from surrounding paragraph context rather than a directly
-applicable footnote (`bloomfield-context`), and (b) the un-footnoted majority of the corpus,
-labeled by DeepSeek reading each sentence's English gloss against itwêwina dictionary entries
-for its content words (`deepseek-dictionary`). Neither is a verified label — `rationale`
-carries the justification for either source.
-
-{classifier_note}
+Every other Cree sentence in the corpus (Bloomfield's 1934 and 1930 texts, plus the EdTeKLA
+Cree Corpus). Each sentence is labeled by an LLM reading its English gloss against itwêwina
+dictionary entries for its content words — not a verified label; `rationale` carries the
+model's justification. Labeled across two passes with two different models (see the `model`
+column): most of the corpus was labeled before the original model was deprecated, and the
+remainder was labeled afterward with a replacement model, chosen after confirming comparable
+accuracy on the gold set.
 
 **Label distribution:**
 {dist(silver)}
 
-**Columns:** `paragraph_id`, `sentence_id`, `text_cree`, `text_en`, `label`, `annotation_source`,
-`rationale`, `classifier_label`, `classifier_confidence`, `prob_literal`/`prob_idiom`/
-`prob_metaphor`/`prob_simile`, `agree_with_classifier`, `model_checkpoint`.
+**Model distribution:**
+{silver['model'].value_counts().to_string()}
+
+**Columns:** `paragraph_id`, `sentence_id`, `text_cree`, `text_en`, `label`,
+`model`, `rationale`.
 
 ## Usage
 
@@ -153,95 +154,43 @@ from datasets import load_dataset
 
 gold   = load_dataset("{repo_id}", split="gold")
 silver = load_dataset("{repo_id}", split="silver")
-
-# e.g. only sentences where the classifier and DeepSeek agree
-high_confidence = silver.filter(lambda r: r["agree_with_classifier"] == True)
 ```
 
 ## Limitations
 
 - `gold` is small and drawn mostly from footnoted paragraphs, which are not a random sample of
   the corpus — Bloomfield tended to footnote passages he found linguistically noteworthy.
-- `silver` labels are not verified. `agree_with_classifier` flags where an independently-trained
-  classifier and the DeepSeek/context-inferred label coincide, but we do not filter the dataset
-  to agreement-only: disagreement is concentrated on the rare idiom/metaphor classes precisely
-  because those are hardest, so dropping it would gut the classes this dataset is meant to help
-  with. Use the flag as a confidence signal, not a cleaning step.
+- `silver` labels are not human-verified.
 
 ## Citation
 
-If you use this dataset, please cite the associated thesis/paper (TBD), and
-Bloomfield, L. (1934). *Plains Cree Texts*. American Ethnological Society.
+If you use this dataset, please cite the associated thesis/paper (TBD), and the
+underlying sources it draws on:
+
+- Bloomfield, L. (1934). *Plains Cree Texts*. American Ethnological Society.
+- Bloomfield, L. (1930). *Sacred Stories of the Sweet Grass Cree*. Unpublished manuscript.
+- Teodorescu, D., Matalski, J., Lothian, D., Barbosa, D., & Demmans Epp, C. (2022). "Cree
+  Corpus: A Collection of nêhiyawêwin Resources." In *Proceedings of the 60th Annual Meeting
+  of the Association for Computational Linguistics (Volume 1: Long Papers)*, pages 6354–6364.
+  https://aclanthology.org/2022.acl-long.440/
+- Napoleon, A. (2014). *Key Terms and Concepts for Exploring Nîhiyaw Tâpisinowin, the Cree
+  Worldview*. Master's thesis, University of Victoria. http://hdl.handle.net/1828/5820
+- Ogg, A. (2024). "Beginning a collection of Cree idioms." Cree Literacy Network.
+  https://creeliteracy.org/2024/04/01/beginning-a-collection-of-cree-idioms/
+- Alberta Language Technology Lab. *itwêwina: Plains Cree Dictionary*. University of
+  Alberta. https://itwewina.altlab.app/ (used for silver-label dictionary grounding;
+  no single canonical citation exists for the dictionary itself)
+- Qwen Team. (2026). *Qwen3.5-Omni Technical Report*. arXiv:2604.15804. (used to produce
+  most of the silver labels, before this model's deprecation)
+- AbacusAI. *Dracarys-Llama-3.1-70B-Instruct*. https://huggingface.co/abacusai/Dracarys-Llama-3.1-70B-Instruct
+  (used to produce the remaining silver labels, after Qwen3.5-122B-A10B's deprecation)
 """
     return DatasetCard(content)
 
 
-def build_silver(gold: pd.DataFrame, checkpoint: str | None,
-                  batch_size: int, max_length: int) -> pd.DataFrame:
-    annot = pd.read_parquet(ANNOT_FILE)
-
-    # (a) Bloomfield sentences whose label came from the footnote-reading procedure,
-    # but which the footnote doesn't directly confirm (footnote_applies == False).
-    context_inferred = annot[annot["footnote_applies"] == False][
-        ["paragraph_id", "sentence_id", "text_cree", "text_en", "label", "rationale"]
-    ].copy()
-    context_inferred["annotation_source"] = "bloomfield-context"
-
-    # (b) the un-footnoted majority, labeled via DeepSeek + itwêwina dictionary evidence.
-    deepseek = pd.read_parquet(SILVER_FILE)[
-        ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label", "reasoning"]
-    ].rename(columns={"deepseek_label": "label", "reasoning": "rationale"})
-    deepseek["annotation_source"] = "deepseek-dictionary"
-
-    silver = pd.concat([context_inferred, deepseek], ignore_index=True)
-
-    # safety net: neither source should overlap gold (deepseek_label_pool.py already
-    # excludes all of ANNOT_FILE, and context_inferred is the complementary
-    # footnote_applies filter on the same file gold comes from), but check anyway.
-    gold_keys = set(zip(gold["paragraph_id"], gold["sentence_id"]))
-    keep = [
-        (pid, sid) not in gold_keys
-        for pid, sid in zip(silver["paragraph_id"], silver["sentence_id"])
-    ]
-    n_dropped = len(silver) - sum(keep)
-    if n_dropped:
-        print(f"  [warn] dropped {n_dropped} silver rows that overlap gold — check upstream exclusion logic")
-    silver = silver[keep].reset_index(drop=True)
-
-    if checkpoint:
-        print(f"Labeling {len(silver):,} silver sentences with {checkpoint} for agreement scoring...")
-        model, tokenizer = load_model(checkpoint)
-        preds = predict_sentences(
-            silver["text_cree"].tolist(), model, tokenizer,
-            batch_size=batch_size, max_length=max_length,
-        )
-        silver["classifier_label"]      = [p["label"] for p in preds]
-        silver["classifier_confidence"] = [p["confidence"] for p in preds]
-        for name in LABEL_NAMES:
-            silver[f"prob_{name}"] = [p[f"prob_{name}"] for p in preds]
-        silver["agree_with_classifier"] = silver["classifier_label"] == silver["label"]
-        silver["model_checkpoint"] = checkpoint
-    else:
-        print("No --checkpoint given — publishing silver labels without classifier agreement columns.")
-        silver["classifier_label"]      = None
-        silver["classifier_confidence"] = None
-        for name in LABEL_NAMES:
-            silver[f"prob_{name}"] = None
-        silver["agree_with_classifier"] = None
-        silver["model_checkpoint"]      = None
-
-    return silver[SILVER_COLUMNS]
-
-
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--checkpoint", default=None,
-                   help="Trained classifier checkpoint to score against the silver labels "
-                        "for agreement (optional — omit to publish silver labels alone, "
-                        "e.g. before the classifier has been trained)")
     p.add_argument("--repo-id", default=REPO_ID)
-    p.add_argument("--batch-size", type=int, default=32)
-    p.add_argument("--max-length", type=int, default=128)
     p.add_argument("--out-dir", default=None,
                    help="Also save gold.parquet / silver.parquet here")
     p.add_argument("--dry-run", action="store_true",
@@ -251,12 +200,10 @@ def main() -> None:
     gold = build_gold()
     print(f"gold split   : {len(gold):,} sentences  |  labels: {gold['label'].value_counts().to_dict()}")
 
-    silver = build_silver(gold, args.checkpoint, args.batch_size, args.max_length)
+    silver = build_silver(gold)
     print(f"silver split : {len(silver):,} sentences  |  labels: {silver['label'].value_counts().to_dict()}")
-    if args.checkpoint:
-        print(f"  agreement with classifier: {silver['agree_with_classifier'].mean():.1%}")
 
-    card = build_card(args.repo_id, args.checkpoint, gold, silver)
+    card = build_card(args.repo_id, gold, silver)
 
     if args.out_dir:
         os.makedirs(args.out_dir, exist_ok=True)
@@ -269,12 +216,17 @@ def main() -> None:
         print("\n--dry-run: not pushing to the Hub.")
         return
 
-    from datasets import Dataset, DatasetDict
-    ds = DatasetDict({
-        "gold":   Dataset.from_pandas(gold, preserve_index=False),
-        "silver": Dataset.from_pandas(silver, preserve_index=False),
-    })
-    ds.push_to_hub(args.repo_id)
+    # gold and silver intentionally have different schemas (distinct provenance
+    # columns, not a conventional train/test split), so DatasetDict.push_to_hub
+    # (which requires identical features across splits) doesn't apply — push each
+    # as its own config instead, which the datasets library supports natively.
+    from datasets import Dataset
+    Dataset.from_pandas(gold, preserve_index=False).push_to_hub(
+        args.repo_id, config_name="gold", split="gold"
+    )
+    Dataset.from_pandas(silver, preserve_index=False).push_to_hub(
+        args.repo_id, config_name="silver", split="silver"
+    )
     card.push_to_hub(args.repo_id, repo_type="dataset")
     print(f"\nPushed → https://huggingface.co/datasets/{args.repo_id}")
 

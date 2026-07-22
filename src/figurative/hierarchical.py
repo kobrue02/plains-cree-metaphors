@@ -20,8 +20,11 @@ import torch.nn.functional as F
 from transformers import AutoModel, PretrainedConfig, PreTrainedModel
 from transformers.modeling_outputs import SequenceClassifierOutput
 
-from src.figurative.data import LITERAL
-
+# Inlined rather than imported from src.figurative.data: this file is pushed
+# to the Hub via register_for_auto_class() below, so it must be import-only
+# self-contained for anyone loading it with trust_remote_code=True, without
+# our package installed.
+LITERAL = 0  # label index — must match src.figurative.data.LITERAL
 NUM_TYPE_LABELS = 3  # idiom, metaphor, simile — LABEL_NAMES[1:]
 
 
@@ -95,3 +98,14 @@ class HierarchicalFigurativeModel(PreTrainedModel):
         loss = self._loss(binary_logit, type_logits, labels) if labels is not None else None
         logits = self._combined_log_probs(binary_logit, type_logits)
         return SequenceClassifierOutput(loss=loss, logits=logits)
+
+
+# Registers config/model with the "custom code on the Hub" mechanism: adds
+# an `auto_map` entry to config.json and copies this file into the repo on
+# push_to_hub()/save_pretrained(), so anyone can load the checkpoint with
+# AutoModel.from_pretrained(repo_id, trust_remote_code=True) — no dependency
+# on this package. Registering locally does NOT make that possible on its
+# own; it only makes AutoModel work within a process that already imported
+# this module (e.g. our own eval scripts).
+HierarchicalFigurativeConfig.register_for_auto_class()
+HierarchicalFigurativeModel.register_for_auto_class("AutoModelForSequenceClassification")

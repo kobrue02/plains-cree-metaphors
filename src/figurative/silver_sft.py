@@ -23,13 +23,15 @@ from transformers import (
     EarlyStoppingCallback,
 )
 
-from src.device import get_trainer_device_kwargs
+from src.device import get_trainer_device_kwargs, get_precision_kwargs
 from src.figurative.calibrate import _read_labeled, _to_records, _load_gold_pool, LABEL2ID
 from src.figurative.data import FigurativeDataset, resolve_use_fast, LABEL_NAMES, NUM_LABELS
 from src.figurative.distill import _freeze_n_layers
 from src.figurative.evaluate import compute_metrics
 from src.figurative.config import FigurativeConfig
 from src.figurative.hierarchical import HierarchicalFigurativeConfig, HierarchicalFigurativeModel
+
+RESULTS_FILE = "data/figurative/silver_sft_sweep_results.parquet"
 
 
 class _BalancedSamplerTrainer(Trainer):
@@ -79,6 +81,33 @@ def _load_silver_records(config: SilverSFTConfig) -> list[dict]:
     records = _to_records(df)
     print(f"[silver_sft] {len(records):,} sentences — {df['label'].value_counts().to_dict()}")
     return records
+
+
+def _save_sweep_result(config: SilverSFTConfig, metrics: dict) -> None:
+    """Persist one row per run (keyed by output_dir) so a sweep over many
+    configs (e.g. freeze_n_layers) can find the overall best afterward without
+    re-parsing logs — mirrors calibrate.py's _save_metrics."""
+    row = {
+        "key":             config.output_dir,
+        "checkpoint":      config.checkpoint,
+        "output_dir":      config.output_dir,
+        "hub_model_id":    config.hub_model_id,
+        "freeze_n_layers": config.freeze_n_layers,
+        "hierarchical":    config.hierarchical,
+        "epochs":          config.epochs,
+        "learning_rate":   config.learning_rate,
+        "macro_f1":        metrics.get("eval_macro_f1"),
+        **{f"{name}_f1": metrics.get(f"eval_{name}_f1") for name in LABEL_NAMES},
+    }
+    os.makedirs(os.path.dirname(RESULTS_FILE), exist_ok=True)
+    if os.path.exists(RESULTS_FILE):
+        df = pd.read_parquet(RESULTS_FILE)
+        df = df[df["key"] != row["key"]]
+        df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    else:
+        df = pd.DataFrame([row])
+    df.to_parquet(RESULTS_FILE, index=False)
+    print(f"[silver_sft] sweep result saved → {RESULTS_FILE}")
 
 
 def train_on_silver(config: SilverSFTConfig) -> str:
@@ -139,6 +168,7 @@ def train_on_silver(config: SilverSFTConfig) -> str:
         logging_steps=10,
         report_to="wandb" if config.wandb_project else "none",
         **get_trainer_device_kwargs(),
+        **get_precision_kwargs(),
         **hub_kwargs,
     )
 
@@ -163,6 +193,7 @@ def train_on_silver(config: SilverSFTConfig) -> str:
     final_metrics = trainer.evaluate()
     print(f"[silver_sft] best gold macro_f1={final_metrics['eval_macro_f1']:.4f}  "
           + "  ".join(f"{l}={final_metrics[f'eval_{l}_f1']:.2f}" for l in LABEL_NAMES))
+    _save_sweep_result(config, final_metrics)
 
     if config.hub_model_id:
         trainer.push_to_hub()

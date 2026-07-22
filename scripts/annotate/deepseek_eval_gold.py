@@ -86,6 +86,17 @@ def main() -> None:
 
     annotate_kwargs = {"annotate_fn": annotate_fn} if annotate_fn else {}
     annotations = annotate_pool(gold, cache_path=args.cache, workers=args.workers, **annotate_kwargs)
+
+    # annotate_pool() drops sentences whose calls kept failing after retries
+    # (see its own comment) rather than caching a fallback label — so not
+    # every gold row is guaranteed a key here. Score only what succeeded
+    # instead of crashing the whole run over one persistent failure.
+    n_before = len(gold)
+    gold = gold[gold["text_cree"].isin(annotations)].copy()
+    if len(gold) < n_before:
+        print(f"  [warn] {n_before - len(gold)} sentence(s) never got a usable "
+              f"annotation after retries — scoring the remaining {len(gold)}")
+
     gold["deepseek_label"] = gold["text_cree"].map(lambda t: annotations[t]["label"])
     gold["reasoning"]      = gold["text_cree"].map(lambda t: annotations[t]["reasoning"])
 
