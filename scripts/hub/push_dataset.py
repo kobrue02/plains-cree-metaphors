@@ -10,8 +10,7 @@ Splits:
   silver — everything else in the corpus (Bloomfield 1934, Bloomfield 1930, and EdTeKLA;
            Ojibwe is excluded as a different language): each sentence's English gloss is
            read against itwêwina dictionary entries for its content words by an LLM
-           (data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet). Labeled by two
-           models across two passes — see the `model` column.
+           (data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet).
 
 Usage:
   python scripts/hub/push_dataset.py --dry-run
@@ -40,7 +39,7 @@ GOLD_COLUMNS = [
 ]
 SILVER_COLUMNS = [
     "paragraph_id", "sentence_id", "text_cree", "text_en", "label",
-    "model", "rationale",
+    "rationale",
 ]
 
 
@@ -52,10 +51,9 @@ def build_gold() -> pd.DataFrame:
 
 def build_silver(gold: pd.DataFrame) -> pd.DataFrame:
     # Every non-gold Cree sentence (Bloomfield 1934/1930 + EdTeKLA) is labeled by
-    # the same dictionary-grounded LLM procedure — see the `model` column for
-    # which of the two annotation passes produced each row.
+    # the same dictionary-grounded LLM procedure.
     silver = pd.read_parquet(SILVER_FILE)[
-        ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label", "model", "reasoning"]
+        ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label", "reasoning"]
     ].rename(columns={"deepseek_label": "label", "reasoning": "rationale"})
 
     # safety net: silver should never overlap gold, but check anyway.
@@ -133,19 +131,12 @@ dataset.
 Every other Cree sentence in the corpus (Bloomfield's 1934 and 1930 texts, plus the EdTeKLA
 Cree Corpus). Each sentence is labeled by an LLM reading its English gloss against itwêwina
 dictionary entries for its content words — not a verified label; `rationale` carries the
-model's justification. Labeled across two passes with two different models (see the `model`
-column): most of the corpus was labeled before the original model was deprecated, and the
-remainder was labeled afterward with a replacement model, chosen after confirming comparable
-accuracy on the gold set.
+model's justification.
 
 **Label distribution:**
 {dist(silver)}
 
-**Model distribution:**
-{silver['model'].value_counts().to_string()}
-
-**Columns:** `paragraph_id`, `sentence_id`, `text_cree`, `text_en`, `label`,
-`model`, `rationale`.
+**Columns:** `paragraph_id`, `sentence_id`, `text_cree`, `text_en`, `label`, `rationale`.
 
 ## Usage
 
@@ -181,9 +172,7 @@ underlying sources it draws on:
   Alberta. https://itwewina.altlab.app/ (used for silver-label dictionary grounding;
   no single canonical citation exists for the dictionary itself)
 - Qwen Team. (2026). *Qwen3.5-Omni Technical Report*. arXiv:2604.15804. (used to produce
-  most of the silver labels, before this model's deprecation)
-- AbacusAI. *Dracarys-Llama-3.1-70B-Instruct*. https://huggingface.co/abacusai/Dracarys-Llama-3.1-70B-Instruct
-  (used to produce the remaining silver labels, after Qwen3.5-122B-A10B's deprecation)
+  the silver labels)
 """
     return DatasetCard(content)
 
