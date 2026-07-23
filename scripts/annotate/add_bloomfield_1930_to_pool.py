@@ -1,17 +1,7 @@
 """
-Split Bloomfield (1930) "Sacred Stories" paragraph pairs into Cree sentences
-and append to the active annotation pool
-(data/bloomfield_texts_sentences.parquet).
-
-This oral-narrative corpus (trickster tales, sacred stories) is more
-figurative-language-rich than the 1934 interlinear gloss corpus, so it's
-worth extending the pool with. Each extracted sentence keeps the whole source
-paragraph's English text as a loose (non-aligned) reference gloss.
-
-Usage:
-  python scripts/add_bloomfield_1930_to_pool.py
-  python scripts/add_bloomfield_1930_to_pool.py --dry-run
-  python scripts/add_bloomfield_1930_to_pool.py --src data/sentences_bloomfield_1930.txt
+Splits Bloomfield (1930) "Sacred Stories" paragraph pairs into Cree sentences
+and appends them to the active annotation pool, using each source paragraph's
+English text as a loose, non-aligned reference gloss.
 """
 
 from __future__ import annotations

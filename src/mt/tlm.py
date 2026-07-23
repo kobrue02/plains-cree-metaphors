@@ -1,10 +1,8 @@
 """
-Fine-tune a masked language model on parallel data using Translation Language Modeling (TLM).
-
-TLM (Lample & Conneau, 2019): sentence pairs are concatenated, tokens are masked from
-both sides, and the model is trained to fill blanks by attending to both languages.
-Running this on Cree-English pairs pulls Cree representations into the same embedding
-space as English.
+Fine-tune a masked language model on parallel data using Translation Language Modeling
+(TLM; Lample & Conneau, 2019): concatenated sentence pairs are masked on both sides so the
+model learns to fill blanks by attending across languages, pulling Cree representations
+into the same embedding space as English.
 """
 
 from __future__ import annotations

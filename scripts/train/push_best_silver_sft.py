@@ -1,15 +1,4 @@
-"""
-Read data/figurative/silver_sft_sweep_results.parquet (written by every run
-of jobs/silver_sft_worker.sh via src.figurative.silver_sft._save_sweep_result),
-find the freeze_n_layers config with the highest gold macro-F1, and push only
-that checkpoint to the Hub — the sweep's other ~16 local checkpoints are left
-on disk (delete manually once you've confirmed the winner) rather than ever
-touching the Hub, so this is the only Hub push the whole sweep produces.
-
-Usage:
-  python scripts/train/push_best_silver_sft.py --dry-run
-  python scripts/train/push_best_silver_sft.py --hub-model-id KonradBRG/xlm-mlm-plains-cree-en-silver-sft-hierarchical
-"""
+"""Find the freeze_n_layers config with the highest gold macro-F1 in the silver-SFT sweep results and push only that checkpoint to the Hub."""
 
 from __future__ import annotations
 import argparse, os, sys

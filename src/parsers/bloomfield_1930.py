@@ -1,20 +1,8 @@
 """
-Extract paragraph-aligned Cree-English pairs from Bloomfield (1930)
-"Sacred Stories of the Sweet Grass Cree".
-
-Reads from the Internet Archive DJVU plain-text export (P005409_djvu.txt),
-which has much cleaner English translations than the PDF OCR.
-
-Each of the 36 stories has a Cree text block followed immediately by its
-English translation. Paragraphs within each story are aligned 1:1 by index.
-
-Note on orthography: Bloomfield (1930) uses his own phonetic notation — not
-modern SRO. The DJVU OCR renders macron-a (â) as 'd' throughout; the text
-is preserved as-is since the model sees character patterns, not orthography.
-
-Usage:
-  python src/parsers/bloomfield_1930.py --txt data/P005409_djvu.txt
-  python src/parsers/bloomfield_1930.py --txt data/P005409_djvu.txt --stats
+Extract paragraph-aligned Cree-English pairs from Bloomfield (1930) "Sacred Stories of the
+Sweet Grass Cree", reading the Internet Archive DJVU plain-text export and aligning each
+story's Cree and English paragraphs 1:1 by index. The DJVU OCR renders macron-a (â) as 'd'
+throughout; this is left as-is since the model sees character patterns, not orthography.
 """
 
 from __future__ import annotations

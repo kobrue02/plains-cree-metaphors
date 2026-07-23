@@ -1,23 +1,4 @@
-"""
-TLM intrinsic evaluation: held-out perplexity + bitext retrieval.
-
-Reports per-model:
-  - MLM pseudo-perplexity on held-out Cree and English text
-  - Bitext retrieval Recall@1, Recall@5, MRR  (Cree→EN and EN→Cree)
-
-Pass --baseline to compare against the raw base model side-by-side.
-
-Usage:
-  python scripts/evaluate/tlm_eval.py \\
-      --model data/tlm_xlm-mlm \\
-      --baseline FacebookAI/xlm-mlm-100-1280
-
-  # Use the Hub checkpoint instead of local dir:
-  python scripts/evaluate/tlm_eval.py \\
-      --model KonradBRG/xlm-mlm-plains-cree-en-tlm \\
-      --baseline FacebookAI/xlm-mlm-100-1280 \\
-      --n 300
-"""
+"""Runs TLM intrinsic evaluation: MLM pseudo-perplexity and bitext retrieval (Recall@1, Recall@5, MRR) on held-out Cree and English text, optionally compared side-by-side against a baseline model."""
 
 from __future__ import annotations
 import argparse, os, sys
@@ -66,8 +47,7 @@ def print_results(label: str, res: dict) -> None:
         print(f"  {direction:<10}  R@1={m['R@1']:.3f}  R@5={m['R@5']:.3f}  MRR={m['MRR']:.3f}")
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model",    required=True,
                    help="TLM checkpoint path or Hub ID")
     p.add_argument("--baseline", default=None,

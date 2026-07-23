@@ -1,18 +1,8 @@
 """
-Shared figurative-language annotation prompt — the dictionary-grounded,
-structured decision procedure developed and iterated on in
-scripts/annotate/deepseek_label_pool.py (v1-v4), then refined by two
-targeted patches validated in the grounding ablation
-(scripts/annotate/ablation_llm_grounding.py; paper Section 6.1): (1)
-itwewina sometimes glosses a word's sense using an English idiom itself
-(e.g. maka = "speak of the devil"), so "matches a listed sense" doesn't
-reliably mean "literal"; (2) many idioms/metaphors are constructional
-(personification, whole-clause metaphor) — no single word's sense is
-"wrong," so the original word-by-word procedure never got a chance to catch
-them. Provider-specific callers (src/annotate/deepseek.py, src/annotate/llm.py)
-both build the user turn via src/scrapers/itwewina.py's format_for_prompt()
-and send this as the system prompt, so every model is judged by the
-identical procedure — no per-provider prompt drift.
+Shared dictionary-grounded, structured decision-procedure prompt for figurative-language
+annotation, used as the system prompt by every provider-specific caller
+(src/annotate/deepseek.py, src/annotate/llm.py) so all models are judged identically —
+no per-provider prompt drift.
 """
 
 from __future__ import annotations

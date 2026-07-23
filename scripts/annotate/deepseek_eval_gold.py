@@ -1,22 +1,9 @@
 """
-Score the DeepSeek dictionary-grounded labeling procedure directly against
-Bloomfield's gold labels, treating DeepSeek itself as a classifier (see
-deepseek_agreement_eval.py for DeepSeek-vs-our-model instead).
-
-The annotation call only ever sees text_cree/text_en (same _annotate_one() as
-on the silver pool) — never label/rationale/footnote_en — so there's no
-leakage of Bloomfield's own justification into the prompt.
-
-By default scores only the 219 footnote-verified sentences (the same
-held-out set src/figurative/calibrate.py evaluates against); pass
---include-unfootnoted to score the full file instead. --nvidia-model runs a
-different NVIDIA-hosted model (needs NVIDIA_API_KEY) through the same
-procedure — see src/annotate/llm.py.
-
-Usage:
-  python scripts/annotate/deepseek_eval_gold.py
-  python scripts/annotate/deepseek_eval_gold.py --limit 50   # smoke test
-  python scripts/annotate/deepseek_eval_gold.py --nvidia-model mistralai/mistral-medium-3.5-128b
+Scores the DeepSeek dictionary-grounded labeling procedure directly against
+Bloomfield's gold labels, treating DeepSeek itself as a classifier. The
+annotation call only ever sees text_cree/text_en, never Bloomfield's own
+label or rationale, so there is no leakage of the gold justification into
+the prompt.
 """
 
 from __future__ import annotations

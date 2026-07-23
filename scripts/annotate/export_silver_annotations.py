@@ -1,11 +1,7 @@
 """
-Export silver annotations into the same column layout as the gold
-annotations file (data/figurative/bloomfield_annotated.parquet), as a separate
-parquet — NOT merged with gold, just structurally consistent with it so the
+Exports silver annotations into the same column layout as the gold
+annotations file, saved as a separate parquet (not merged with gold) so the
 two are easy to compare or load side by side later.
-
-Usage:
-  python scripts/annotate/export_silver_annotations.py
 """
 
 from __future__ import annotations

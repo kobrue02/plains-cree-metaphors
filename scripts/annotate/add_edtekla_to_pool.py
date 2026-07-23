@@ -1,17 +1,7 @@
 """
-Add EdTeKLA Cree-English sentence pairs to the active annotation pool
-(data/bloomfield_texts_sentences.parquet), so they flow through the same
-silver-annotation pipeline (deepseek_label_pool.py / predict_pool.py) as the
-Bloomfield material.
-
-Unlike Bloomfield, EdTeKLA pairs are already sentence-level (speaker stories,
-social media, children's books, educational texts — see
-src/scrapers/edtekla.py), not paragraphs that need splitting, so each pair
-becomes its own paragraph_id with sentence_id=0.
-
-Usage:
-  python scripts/annotate/add_edtekla_to_pool.py
-  python scripts/annotate/add_edtekla_to_pool.py --dry-run
+Adds EdTeKLA Cree-English sentence pairs to the active annotation pool so
+they flow through the same silver-annotation pipeline as the Bloomfield
+material.
 """
 
 from __future__ import annotations

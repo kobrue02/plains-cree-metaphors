@@ -1,15 +1,7 @@
 """
-Apply the human-verified corrections from verify_gold.py's review cache onto
-the canonical gold file, so every downstream script (eval, training, dataset
-stats) picks up the corrected labels instead of DeepSeek's original proposal.
-
-Keeps DeepSeek's original label for provenance (label_deepseek) and adds
-human_verified / human_corrected flags. Refuses to run twice on an
-already-corrected file (idempotent — checks for the human_verified column).
-
-Usage:
-  python scripts/annotate/apply_gold_corrections.py
-  python scripts/annotate/apply_gold_corrections.py --dry-run
+Applies the human-verified corrections from verify_gold.py's review cache
+onto the canonical gold file, preserving DeepSeek's original label for
+provenance so downstream scripts pick up the corrected labels.
 """
 
 from __future__ import annotations

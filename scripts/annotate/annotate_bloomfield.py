@@ -1,15 +1,7 @@
 """
-Annotate Bloomfield paragraphs that have footnotes using DeepSeek.
-
-Bloomfield's footnotes are expert linguistic commentary — they are the closest
-thing to gold labels we have. DeepSeek reads each footnote and translates it
-into our 4-class scheme, then assigns a label to each sentence in the paragraph.
-
-Only the ~420 footnoted paragraphs are sent to the API. The remaining ~5000
-paragraphs are left for CLKD-based silver annotation.
-
-Output: data/figurative/bloomfield_annotated.parquet
-Resume-safe: progress is checkpointed to data/figurative/annotation_cache.jsonl
+Uses DeepSeek to read Bloomfield's footnotes on the ~420 footnoted paragraphs
+and translate them into the 4-class figurative-language scheme, assigning a
+label to each sentence in those paragraphs.
 """
 
 from __future__ import annotations

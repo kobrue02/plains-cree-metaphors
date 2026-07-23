@@ -1,25 +1,4 @@
-"""
-Summary statistics for the final figurative-language annotated dataset
-(gold + silver, deduplicated) for the writeup.
-
-"Gold" = data/figurative/bloomfield_annotated.parquet (Bloomfield footnote-driven
-DeepSeek annotation, scripts/annotate/annotate_bloomfield.py). Includes both
-footnote-verified rows (footnote_applies=True, n=219 — the fixed held-out test
-set src/figurative/calibrate.py always evaluates against and never trains on)
-and same-paragraph rows labeled by context only (footnote_applies=False,
-which calibrate.py does train on).
-
-"Silver" = data/figurative/deepseek_labels.parquet (dictionary-grounded
-DeepSeek annotation over the un-footnoted majority of the corpus,
-scripts/annotate/deepseek_label_pool.py).
-
-Where a sentence appears in both (the silver pass doesn't know about gold
-footnoted sentences and re-annotates them too), the gold label wins.
-
-Usage:
-  python scripts/viz/final_dataset_stats.py
-  python scripts/viz/final_dataset_stats.py --gold-footnoted-only   # 219-row gold subset instead of all 1,225
-"""
+"""Print summary statistics for the final figurative-language annotated dataset (gold + silver, deduplicated) for the writeup."""
 
 from __future__ import annotations
 import argparse, os, re, sys

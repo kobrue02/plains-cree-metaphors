@@ -1,10 +1,4 @@
-"""
-List every KonradBRG Hub model repo relevant to this project, categorized so
-it's safe to decide what to delete before actually deleting anything.
-
-Usage:
-  python scripts/hub/list_checkpoints.py
-"""
+"""List every KonradBRG Hub model repo relevant to this project, categorized so it's safe to decide what to delete before actually deleting anything."""
 
 from __future__ import annotations
 from huggingface_hub import HfApi

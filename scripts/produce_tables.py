@@ -1,34 +1,4 @@
-"""
-Run every table-producing evaluation step in one go, once the training/
-ablation jobs have finished — a single entry point instead of remembering
-which of the four separate scripts feeds which paper table.
-
-  1. scripts/evals/eval_cv.py               -> tab:ablation-loo, and the
-                                                "Full" row of Table 3
-  2. scripts/evals/figurative_results_table.py -> the rest of Table 3
-                                                (Majority/No adapt./+TLM/+TLM+CLKD)
-  3. scripts/evaluate/tlm_eval_table.py      -> tab:tlm-eval (TLM intrinsic:
-                                                pseudo-perplexity + bitext retrieval)
-  4. scripts/evals/llm_annotator_comparison.py -> LLM-vs-gold comparison table
-
-Each step runs even if an earlier one fails or a checkpoint isn't ready yet
-(e.g. a training job still pending) — failures/skips are collected and
-reported in a summary at the end instead of aborting the whole run, since a
-missing checkpoint for one row shouldn't block the tables that don't need it.
-
-This does real Hub checkpoint downloads and GPU inference — run it on a node
-(see jobs/produce_tables.sh), not the login shell.
-
-Usage:
-  python scripts/produce_tables.py
-  python scripts/produce_tables.py --skip-cv --skip-tlm-eval
-  python scripts/produce_tables.py \
-      --baseline-checkpoint KonradBRG/xlm-mlm-100-1280-figurative-baseline \
-      --tlm-checkpoint      KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative \
-      --clkd-checkpoint     KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full \
-      --tlm-eval-no-infonce-checkpoint KonradBRG/xlm-mlm-abl-no-clkd-plains-cree-en-tlm \
-      --tlm-eval-infonce-checkpoint    KonradBRG/xlm-mlm-plains-cree-en-tlm
-"""
+"""Run every table-producing evaluation step needed for the paper in one go; each step runs even if an earlier one fails or a checkpoint isn't ready yet, with failures/skips collected into a summary at the end."""
 
 from __future__ import annotations
 import argparse, subprocess, sys

@@ -1,25 +1,4 @@
-"""
-Generate TikZ/pgfplots figures for the paper from evaluation parquet files.
-
-Run on the HPC once the relevant eval job has produced its output:
-  python scripts/viz/generate_figures.py
-
-Output:
-  figures/ablation_heatmap.tex         — per-class F1 heatmap across ablation conditions (eval_validation_set.sh)
-  figures/ablation_macro_f1.tex        — macro-F1 bar chart, ablation conditions grouped by role (eval_validation_set.sh)
-  figures/contrastive_impact.tex       — per-class F1, full pipeline vs +contrastive alignment (eval_validation_set.sh)
-  figures/contrastive_alpha_sweep.tex  — macro F1 vs. InfoNCE weight alpha (jobs/alpha_sweep.sh + eval_validation_set.sh)
-  figures/compile_figures.tex          — standalone LaTeX wrapper for whichever figures were written
-
-A figure whose source file or model rows aren't ready yet is skipped with a
-message instead of crashing the whole run — safe to re-run as ablation/eval
-jobs land one at a time.
-
-NOTE: the consistency-heatmap and figurative-rate-distribution figures that
-used to live here were removed along with scripts/evals/eval_all.py's
-task_consistency/task_figurative_rate (see that module) — their source data
-can no longer be produced.
-"""
+"""Generate TikZ/pgfplots figures for the paper from evaluation parquet files, skipping with a message any figure whose source data isn't ready yet."""
 
 from __future__ import annotations
 import os

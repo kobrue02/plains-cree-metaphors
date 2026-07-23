@@ -1,24 +1,4 @@
-"""
-Create HuggingFace Collections and add all trained models to them.
-
-`add_model_to_collection()` is imported directly by pipeline.py and called at
-the end of each stage that pushes to the Hub, so new checkpoints are slotted
-into their collection without a separate manual step.
-
-Run directly to (re)sync every known model into its collection, e.g. after
-adding a new ablation condition or if a push failed mid-job:
-
-  python scripts/hub/create_collections.py
-  python scripts/hub/create_collections.py --repo KonradBRG/xlm-mlm-abl-full-plains-cree-en-calibrated --stage calibrated
-
-Requires: huggingface-cli login (or HF_TOKEN env var set)
-
-Collections created:
-  1. Plains Cree TLM Encoders
-  2. Plains Cree Figurative Language Classifiers
-  3. Plains Cree CLKD Models
-  4. Plains Cree Calibrated Figurative Classifiers
-"""
+"""Create HuggingFace Collections and add all trained models to them; run directly to (re)sync every known model into its collection."""
 
 from __future__ import annotations
 import argparse, sys

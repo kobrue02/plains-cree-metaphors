@@ -1,19 +1,7 @@
 """
-itwêwina Plains Cree Dictionary scraper.
-
-Queries https://itwewina.altlab.app/search?q=<word> and parses the HTML
-to extract lemma, part-of-speech, grammatical class, and English definitions.
-
-Usage:
-    from src.scrapers.itwewina import lookup, lookup_sentence
-
-    # Single word
-    entries = lookup("nipiy")
-    # → [{"lemma": "nipiy", "pos": "NI-2", "definitions": ["water", "body of water"]}, ...]
-
-    # All content words in a Cree sentence
-    results = lookup_sentence("nipiy kâ-pahkihtik")
-    # → {"nipiy": [...], "pahkihtik": [...]}
+itwêwina Plains Cree Dictionary scraper: queries https://itwewina.altlab.app/search?q=<word>
+and parses the HTML to extract lemma, part-of-speech, grammatical class, and English
+definitions for a word or all content words in a Cree sentence.
 """
 
 from __future__ import annotations

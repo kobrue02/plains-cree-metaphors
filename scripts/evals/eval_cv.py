@@ -1,22 +1,4 @@
-"""
-Honest, held-out evaluation via k-fold cross-validation.
-
-Unlike scripts/evals/eval_all.py's validation task (which scores the Hub-hosted
-*production* calibrated models — trained on the entire annotation pool, so
-scoring them against that same pool is in-sample, not held-out), this script
-uses the per-fold calibration checkpoints from jobs/calibrate_cv.sh. For each
-condition, each of the 5 fold models predicts only on the fold it never
-trained on; concatenating all 5 folds' predictions covers the entire
-annotation pool with a genuinely held-out prediction for every sentence.
-
-Requires (per condition, once): scripts/data/build_cv_folds.py, then
-jobs/calibrate_cv.sh to produce data/calibrated_{model_id}-fold{0..4}/ locally
-(these are never pushed to the Hub — see pipeline.py --holdout-fold).
-
-Usage:
-  python scripts/evals/eval_cv.py
-  python scripts/evals/eval_cv.py --condition "Ablation: full"
-"""
+"""Runs honest, held-out evaluation via k-fold cross-validation: for each condition, each of the 5 per-fold calibration checkpoints (from jobs/calibrate_cv.sh) predicts only on the fold it never trained on, and the concatenated predictions cover the entire annotation pool without leakage."""
 
 from __future__ import annotations
 import argparse, os, sys
@@ -103,7 +85,7 @@ def predict_condition(model_id: str, folds: pd.DataFrame, batch_size: int = 32, 
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--condition", default=None, help="Only run this one condition (by label)")
     args = p.parse_args()
 

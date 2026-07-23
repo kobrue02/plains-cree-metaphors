@@ -1,52 +1,4 @@
-"""
-The core results table: Majority / no-adaptation / +TLM / +TLM+CLKD / +TLM+CLKD+SFT.
-
-  | Model        | Macro F1 | Literal | Idiom | Metaphor | Simile |
-  | ------------ | -------- | ------- | ----- | -------- | ------ |
-  | Majority     |          |         |       |          |        |
-  | No adapt.    |          |         |       |          |        |
-  | +TLM         |          |         |       |          |        |
-  | +TLM+CLKD    |          |         |       |          |        |
-  | Full         |          |         |       |          |        |
-
-Model-agnostic — "no adaptation" can be any multilingual encoder, not
-specifically one family. Defaults below point at the FacebookAI/xlm-mlm-100-1280
-lineage since that's the furthest along right now: its +TLM and +TLM+CLKD
-classifier checkpoints already exist on the Hub (from earlier config.py-preset
-runs, not the pipeline.py ablation runs — see --tlm-checkpoint/--clkd-checkpoint
-below for exactly which). Only the "no adaptation" checkpoint is missing for
-this lineage; see scripts/train/train_figurative_english.py to produce it.
-To point this at a different encoder entirely, override all three
---baseline-checkpoint/--tlm-checkpoint/--clkd-checkpoint explicitly.
-
-Evaluation protocol differs by row, because each row's checkpoint has a
-different relationship to the gold annotation pool:
-
-  - Majority, no-adaptation, +TLM, +TLM+CLKD: none of these checkpoints were
-    ever trained on the Cree gold set (majority is data-free; the other three
-    only ever see English VUA20+MAGPIE+FLUTE and/or the *unlabeled*
-    Cree-English parallel corpus for CLKD). So it's safe to evaluate them
-    directly against the WHOLE gold pool with a single checkpoint — there's
-    no leakage to worry about.
-  - Full (+TLM+CLKD+SFT): calibration *is* trained on (subsets of) the gold
-    pool, so scoring the production calibrated model against that same pool
-    would be in-sample and optimistic. This row instead uses the honest
-    5-fold cross-validation protocol from scripts/evals/eval_cv.py: each
-    fold's calibration checkpoint predicts only on the fold it never trained
-    on, and the five out-of-fold prediction sets are concatenated to cover
-    the whole pool without leakage. Requires jobs/calibrate_cv.sh to have
-    been run for --model-id first (the *-fold{0..4} local checkpoints it
-    produces are never pushed to the Hub, so this step needs the cluster).
-
-Usage:
-  python scripts/evals/figurative_results_table.py
-  python scripts/evals/figurative_results_table.py --model-id xlm-mlm   # default, matches the CV-fold naming
-  python scripts/evals/figurative_results_table.py --gold-footnoted-only
-  python scripts/evals/figurative_results_table.py \
-      --baseline-checkpoint KonradBRG/some-other-encoder-figurative \
-      --tlm-checkpoint      KonradBRG/some-other-encoder-plains-cree-en-tlm-figurative \
-      --clkd-checkpoint     KonradBRG/some-other-encoder-plains-cree-en-clkd
-"""
+"""Builds the core results table (Majority / no-adaptation / +TLM / +TLM+CLKD / +TLM+CLKD+SFT rows, macro F1 and per-class scores) against the gold annotation pool. The Full (+TLM+CLKD+SFT) row uses eval_cv.py's honest 5-fold cross-validation protocol since its checkpoint was trained on the gold pool; the other rows, which never saw gold labels, are evaluated directly against the whole pool."""
 
 from __future__ import annotations
 import argparse, os, sys
@@ -163,8 +115,7 @@ def eval_cv(model_id: str, gold: pd.DataFrame) -> dict | None:
     return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model-id", default="xlm-mlm",
                    help="model_id used for the CV-fold calibrated checkpoints in the "
                         "'Full' row (default: xlm-mlm, matching jobs/calibrate_cv.sh naming)")

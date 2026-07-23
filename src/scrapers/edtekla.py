@@ -1,13 +1,8 @@
 """
 Fetch parallel Plains Cree / English texts from the EdTeKLA IndigenousLanguages_Corpora
-repository and write them in the ``src ||| tgt`` format used by the TLM pipeline.
-
-All files are fetched via raw GitHub content URLs — no API token required.
-Files with equal line counts are zipped directly.  Mismatched counts fall
-back to the Gale–Church DP aligner already used by ParallelSentenceSplitter.
-
-Source: https://github.com/EdTeKLA/IndigenousLanguages_Corpora
-Citation: Teodorescu et al., ACL 2022
+repository and write them in the ``src ||| tgt`` format used by the TLM pipeline. Files with
+equal line counts are zipped directly; mismatched counts fall back to the Gale–Church DP
+aligner already used by ParallelSentenceSplitter.
 """
 
 from __future__ import annotations

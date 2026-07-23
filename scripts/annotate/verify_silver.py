@@ -1,28 +1,7 @@
 """
-Interactive CLI to manually spot-check a sample of the silver-labeled sentences
-(data/figurative/deepseek_labels.parquet, the dictionary-grounded silver pool).
-
-Unlike the gold set (all 228 reviewed, see verify_gold.py), the silver pool is
-too large (9,613 sentences) to review exhaustively, so this draws a fixed
-sample once and lets you work through it over multiple sittings.
-
-Sampling is stratified by label by default (--n-per-class per label, so
-idiom/metaphor/simile — 233/563/90 of 9,613 — aren't drowned out by literal).
-This means the sample is NOT population-representative: --report gives both
-the raw per-class agreement (how good DeepSeek is *within* each class) and a
-population-weighted overall estimate (using the full silver set's actual
-label proportions), so the two don't get conflated.
-
-The sample is drawn once and saved to SAMPLE_FILE (refuses to redraw if it
-already exists — pass --redraw to force a fresh sample, which discards any
-review progress on the old one). Review progress is checkpointed to a
-resume-safe JSONL cache, same pattern as verify_gold.py.
-
-Usage:
-  python scripts/annotate/verify_silver.py                  # review unverified rows
-  python scripts/annotate/verify_silver.py --redo            # also re-review already-verified rows
-  python scripts/annotate/verify_silver.py --only-label idiom
-  python scripts/annotate/verify_silver.py --report          # print agreement stats only
+Interactive CLI to manually spot-check a stratified sample of the
+silver-labeled sentences, since the full pool is too large to review
+exhaustively.
 """
 
 from __future__ import annotations

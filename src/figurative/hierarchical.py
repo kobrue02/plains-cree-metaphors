@@ -1,15 +1,9 @@
 """
-Two-head hierarchical figurative classifier: a binary head decides
-literal-vs-figurative, and a conditional 3-way head (idiom/metaphor/simile)
-is trained only on the figurative subset — so the type head's gradient isn't
-diluted by the ~18:1 literal majority the way a single 4-way softmax's is.
-
-Combines both heads into proper joint probabilities (P(literal) = 1 -
-P(figurative); P(type_k) = P(figurative) * P(type_k | figurative)) so it's a
-drop-in replacement for AutoModelForSequenceClassification wherever
-downstream code just consumes `.logits` (predict_sentences, compute_metrics):
-softmax(these log-probabilities) recovers the probabilities exactly, and
-argmax reproduces the cascade decision.
+Two-head hierarchical figurative classifier: a binary head decides literal-vs-figurative,
+and a conditional 3-way head (idiom/metaphor/simile) is trained only on the figurative
+subset. The two heads' outputs are combined into joint probabilities so the model is a
+drop-in replacement for AutoModelForSequenceClassification wherever downstream code
+consumes `.logits`.
 """
 
 from __future__ import annotations

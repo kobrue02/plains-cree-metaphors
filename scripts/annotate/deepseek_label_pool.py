@@ -1,27 +1,9 @@
 """
-Label the sentence pool with DeepSeek only (no model involved).
-
-For every Cree sentence in the pool (excluding the 1930 manuscript by
-default), DeepSeek is given the Cree sentence, its English gloss, and
-itwêwina dictionary entries for each content word, and classifies it as
-literal / idiom / metaphor / simile from that evidence alone. The reasoning
-chain is kept alongside the label in a "reasoning" field, for auditing why a
-given label was chosen.
-
-Gold and silver are meant to be disjoint (silver = "the un-footnoted majority
-of the corpus" per the writeup) — gold sentences are excluded here so silver
-never re-annotates something that already has a better-grounded label.
-
-Resume-safe: labels (and reasoning) are checkpointed to a JSONL cache as they
-come in, so an interrupted run picks up where it left off.
-
-Run this on its own, then scripts/annotate/predict_pool.py, then
-scripts/annotate/agreement_eval.py to compare the two.
-
-Usage:
-  python scripts/annotate/deepseek_label_pool.py
-  python scripts/annotate/deepseek_label_pool.py --limit 500   # smoke test
-  python scripts/annotate/deepseek_label_pool.py --workers 16
+Labels the sentence pool with DeepSeek alone (no trained model), classifying
+each Cree sentence as literal/idiom/metaphor/simile from its English gloss
+and itwêwina dictionary entries, with reasoning cached alongside each label.
+Gold-set sentences are excluded so silver never re-annotates something that
+already has a better-grounded label.
 """
 
 from __future__ import annotations

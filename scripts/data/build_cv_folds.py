@@ -1,32 +1,4 @@
-"""
-Assign every GOLD sentence (footnote_applies=True, n=228) to one of K stratified
-cross-validation folds, once. ANNOT_FILE (bloomfield_annotated.parquet) also
-contains ~1,000 additional Bloomfield sentences that were silver-labeled and
-merged into the same file for other purposes — those are filtered out here,
-since SFT/calibration must only ever fold over and train on the gold subset
-(paper Section 3.5).
-
-calibrate.py can then train with any single fold excluded (--holdout-fold), and
-scripts/evals/eval_cv.py aggregates all K folds' held-out predictions into one
-evaluation covering the entire annotation pool: every sentence gets a genuinely
-held-out prediction, and every sentence is still available for training in the
-K-1 folds where it isn't held out.
-
-This exists because a single fixed train/test split doesn't work well here —
-there are only ~60 figurative examples (idiom/metaphor/simile) total, so any
-split ratio either leaves too few in the test set to mean anything, or leaves
-too few in training for calibration to learn the class at all. K-fold avoids
-that trade-off by using every example for both roles, just never at the same
-time.
-
-Run once:
-  python scripts/data/build_cv_folds.py
-
-Refuses to overwrite an existing fold assignment — delete
-data/figurative/cv_folds.parquet manually first if you really mean to redraw it
-(models already calibrated against specific folds would silently become
-inconsistent with a new assignment).
-"""
+"""Assigns every gold sentence to one of K stratified cross-validation folds, once, so calibration and scripts/evals/eval_cv.py can use consistent held-out splits. Refuses to overwrite an existing fold assignment."""
 
 from __future__ import annotations
 import os, sys

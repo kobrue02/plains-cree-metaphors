@@ -1,24 +1,8 @@
 """
-Cross-lingual adaptation of a figurative classifier.
-
-Three modes:
-
-  align      — cosine loss between [CLS] of Cree and English.  No label
-               assumption.  Only the encoder updates; the classification
-               head is frozen.
-
-  binary_kl  — KL divergence between the model's predictions on the Cree
-               text and (teacher) predictions on its English translation,
-               collapsed to binary (literal vs. figurative).  Temperature
-               scaling hedges against cross-linguistic type mismatches.
-
-  clkd       — Cross-Lingual Knowledge Distillation.  A dedicated frozen
-               English teacher (e.g. DeBERTa-v3 fine-tuned on VUA20+MAGPIE)
-               predicts the full soft-label distribution on the English side
-               of the parallel corpus; the student (XLM TLM checkpoint) is
-               trained on the Cree side to match via KL divergence.
-               Optionally the first N student layers are frozen to preserve
-               the cross-lingual representations built during TLM pre-training.
+Cross-lingual adaptation of a figurative classifier via three modes: align (unsupervised
+cosine loss between Cree/English [CLS] embeddings), binary_kl (KL distillation from English
+predictions to Cree, collapsed to literal-vs-figurative), and clkd (full soft-label
+distillation from a frozen English teacher to a Cree student over parallel text).
 """
 
 from __future__ import annotations

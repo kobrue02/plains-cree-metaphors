@@ -1,20 +1,7 @@
 """
-Interactive CLI to manually verify DeepSeek's gold-set annotations
-(data/figurative/bloomfield_annotated.parquet, footnote_applies == True).
-
-For each sentence, shows the Cree text, English translation, Bloomfield's
-footnote (the actual evidence DeepSeek was given), and DeepSeek's assigned
-label + rationale. You confirm or correct the label.
-
-Resume-safe: verdicts are checkpointed to a jsonl cache keyed by
-(paragraph_id, sentence_id), so you can quit (Ctrl-C or 'q') and pick back up
-later without re-reviewing anything.
-
-Usage:
-  python scripts/annotate/verify_gold.py                  # review unverified rows
-  python scripts/annotate/verify_gold.py --redo           # also re-review already-verified rows
-  python scripts/annotate/verify_gold.py --only-idiom      # filter to one label first
-  python scripts/annotate/verify_gold.py --report          # just print agreement stats, no review
+Interactive CLI to manually verify DeepSeek's gold-set annotations, showing
+the Cree text, English translation, Bloomfield's footnote evidence, and
+DeepSeek's assigned label for you to confirm or correct.
 """
 
 from __future__ import annotations

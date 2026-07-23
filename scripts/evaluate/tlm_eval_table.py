@@ -1,17 +1,4 @@
-"""
-Build the Base / +TLM / +TLM+InfoNCE comparison table for the writeup:
-
-  | Model        | Cree PPL | English PPL | Cree->EN MRR | EN->Cree MRR |
-
-Reuses evaluate() from scripts/evaluate/tlm_eval.py (same held-out split,
-same pseudo-perplexity + bitext retrieval metrics) across a fixed list of
-checkpoints instead of just a --model/--baseline pair.
-
-Usage:
-  python scripts/evaluate/tlm_eval_table.py
-  python scripts/evaluate/tlm_eval_table.py --n 500
-  python scripts/evaluate/tlm_eval_table.py --model "+TLM+InfoNCE=KonradBRG/xlm-mlm-plains-cree-en-tlm-infonce"
-"""
+"""Builds the Base / +TLM / +TLM+InfoNCE comparison table (Cree/English perplexity, bitext retrieval MRR) by reusing evaluate() from scripts/evaluate/tlm_eval.py across a fixed list of checkpoints."""
 
 from __future__ import annotations
 import argparse, os, sys
@@ -53,8 +40,7 @@ def _parse_model_arg(spec: str) -> tuple[str, str]:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", action="append", default=[],
                    metavar="LABEL=CHECKPOINT",
                    help="Add/override a row, e.g. --model \"+TLM+InfoNCE=KonradBRG/...\". "

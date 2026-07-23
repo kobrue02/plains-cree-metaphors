@@ -1,20 +1,4 @@
-"""
-Fetch the best run from a wandb sweep and save its config.
-
-Usage:
-  python3 scripts/train/best_sweep_config.py <sweep_id>
-  python3 scripts/train/best_sweep_config.py konradbrg-uni/FNLP/0cvfxt6y
-
-  # Execute the pipeline directly with the best config:
-  python3 scripts/train/best_sweep_config.py <sweep_id> --run
-
-  # Submit to the cluster instead:
-  python3 scripts/train/best_sweep_config.py <sweep_id> --sbatch
-
-Outputs:
-  data/sweep_best/<sweep_id>.json   — best hyperparameters + metric
-  Prints (and optionally runs) a ready-to-use pipeline.py command.
-"""
+"""Fetch the best run from a wandb sweep and save its config."""
 
 from __future__ import annotations
 import argparse

@@ -1,14 +1,4 @@
-"""
-CLI wrapper around funcs.train_silver — fine-tune a TLM-adapted encoder
-directly on the full-pool LLM (Qwen) silver labels, then evaluate on the
-fixed 228-sentence gold set. Silver-SFT vs. CLKD comparison on identical
-held-out data.
-
-Usage:
-  python scripts/train/train_silver.py \
-      --checkpoint KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm \
-      --hub-model-id KonradBRG/xlm-mlm-100-1280-plains-cree-en-silver-sft
-"""
+"""CLI wrapper around funcs.train_silver — fine-tune a TLM-adapted encoder directly on the full-pool LLM (Qwen) silver labels, then evaluate on the fixed 228-sentence gold set."""
 
 from __future__ import annotations
 import argparse, os, sys

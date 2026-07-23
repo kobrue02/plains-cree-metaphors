@@ -1,24 +1,4 @@
-"""
-Build the Plains Cree figurative-language dataset and push it to the Hub.
-
-Splits:
-  gold   — data/figurative/bloomfield_annotated.parquet rows where Bloomfield's own
-           footnote commentary directly applies (footnote_applies == True), plus a
-           handful of supplementary idiom/metaphor examples from external sources
-           (see the `source_file` column). This is the closest thing to a
-           human-verified label this project has.
-  silver — everything else in the corpus (Bloomfield 1934, Bloomfield 1930, and EdTeKLA;
-           Ojibwe is excluded as a different language): each sentence's English gloss is
-           read against itwêwina dictionary entries for its content words by an LLM
-           (data/figurative/deepseek_labels_qwen_qwen3.5-122b-a10b.parquet).
-
-Usage:
-  python scripts/hub/push_dataset.py --dry-run
-  python scripts/hub/push_dataset.py
-  python scripts/hub/push_dataset.py --out-dir data/figurative/dataset
-
-Requires: huggingface-cli login (or HF_TOKEN env var set), unless --dry-run.
-"""
+"""Build the Plains Cree figurative-language dataset, with its gold and silver splits, and push it to the Hub."""
 
 from __future__ import annotations
 import argparse, os, sys

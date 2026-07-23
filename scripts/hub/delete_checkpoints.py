@@ -1,23 +1,4 @@
-"""
-Delete stale Hub checkpoints: alpha-sweep runs, legacy ablation-calibrated
-checkpoints (superseded by CV-only ablation, see jobs/ablation.sh), stale/
-superseded CLKD naming variants, and TLM checkpoints already consumed by a
-CLKD checkpoint that's kept (or otherwise superseded).
-
-Explicitly NOT deleted, even though they'd match a naive "delete all
-intermediate" rule:
-  - xlm-mlm-plains-cree-en-tlm            (production a=0.2 TLM — backs
-                                            tab:tlm-eval's "+TLM+InfoNCE" col)
-  - xlm-mlm-abl-no-clkd-plains-cree-en-tlm (a=0.0 TLM — backs tab:tlm-eval's
-                                            "+TLM" column)
-  - xlm-r-large-plains-cree-en-tlm        (pending input for xlm-r-large's
-                                            not-yet-run CLKD stage)
-
-Usage:
-  python scripts/hub/delete_checkpoints.py            # asks for confirmation
-  python scripts/hub/delete_checkpoints.py --yes       # no prompt
-  python scripts/hub/delete_checkpoints.py --dry-run
-"""
+"""Delete stale Hub checkpoints (alpha-sweep runs, superseded ablation/CLKD/TLM variants), while explicitly keeping the specific checkpoints that still back published paper tables."""
 
 from __future__ import annotations
 import sys

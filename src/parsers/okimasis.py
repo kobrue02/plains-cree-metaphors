@@ -1,24 +1,8 @@
 """
-Extract Plains Cree–English parallel sentence pairs from:
-  Okimāsis, Jean L. (2018). Cree: Language of the Plains.
-  University of Regina Press. (Open Access PDF)
-
-Two dominant patterns in the grammar chapters:
-
-  Pattern A — inline (numbered examples):
-    1. nikī-atoskān.                    I worked.
-    2. kinōhtē-mīcison cī?             Do you want to eat?
-
-  Pattern B — stacked:
-    nikī-atoskānān otākosīhk niyanān.
-    We (not you) worked yesterday.
-
-Cree text is identified by SRO macron vowels: ā ē ī ō
-(this book uses macrons; Bloomfield uses circumflexes — both are valid SRO)
-
-Usage:
-  python src/parsers/okimasis.py --pdf <path>
-  python src/parsers/okimasis.py --pdf <path> --out data/sentences_okimasis.txt
+Extract Plains Cree–English parallel sentence pairs from Okimāsis, Jean L. (2018) "Cree:
+Language of the Plains" (University of Regina Press), handling both inline numbered examples
+and stacked Cree/English line pairs. Cree text is identified by SRO macron vowels (ā ē ī ō),
+which this book uses in place of the circumflexes Bloomfield uses.
 """
 
 from __future__ import annotations

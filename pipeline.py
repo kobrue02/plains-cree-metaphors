@@ -1,34 +1,6 @@
 """
-End-to-end figurative language pipeline for Plains Cree.
-
-Stages (all optional, all chainable):
-  1. TLM        — Translation Language Modelling warmup on Cree-English pairs
-  2. CLKD       — Cross-Lingual Knowledge Distillation from English DeBERTa teacher
-  3. Calibrate  — Low-LR adjustment on DeepSeek-annotated Bloomfield validation set
-
-Hub naming (derived from --model-id):
-  TLM        → {hub-prefix}/{model-id}-plains-cree-en-tlm
-  CLKD       → {hub-prefix}/{model-id}-plains-cree-en-clkd
-  Calibrated → {hub-prefix}/{model-id}-plains-cree-en-figurative
-
-Examples:
-  # Full pipeline, xlm-mlm base
-  python pipeline.py --base-model FacebookAI/xlm-mlm-100-1280 --model-id xlm-mlm
-
-  # XLM-V needs shorter max-length to avoid OOM
-  python pipeline.py --base-model facebook/xlm-v-base --model-id xlm-v --max-length 128
-
-  # Glot500, skip TLM — reuse the legacy TLM checkpoint (pushed under a
-  # different --model-id than this run, so point CLKD at it explicitly;
-  # --skip-tlm alone would look for the nonexistent KonradBRG/glot500-plains-cree-en-tlm)
-  python pipeline.py --base-model cis-lmu/glot500-base --model-id glot500 \
-      --skip-tlm --clkd-from KonradBRG/glot500-base-plains-cree-en-tlm
-
-  # Same caveat applies to XLM-V if you ever skip its TLM stage:
-  # --clkd-from KonradBRG/xlm-v-base-plains-cree-en-tlm
-
-  # Resume from existing CLKD checkpoint, only calibrate
-  python pipeline.py --model-id xlm-mlm --skip-tlm --skip-clkd
+End-to-end figurative language pipeline for Plains Cree: chains TLM warmup,
+Cross-Lingual Knowledge Distillation, and calibration into one runnable script.
 """
 
 from __future__ import annotations

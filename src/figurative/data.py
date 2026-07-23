@@ -1,24 +1,7 @@
 """
-Build a combined sentence-level dataset from VUA20, MAGPIE, and FLUTE.
-
-Labels
-------
-  0 = literal  — no figurative usage (VUA20 sentences with no metaphor token;
-                 MAGPIE sentences used literally)
-  1 = idiom    — idiomatic MWE usage (MAGPIE figurative; FLUTE Idiom)
-  2 = metaphor — at least one metaphorical token (VUA20); FLUTE Metaphor
-  3 = simile   — explicit simile construction (FLUTE Simile)
-
-Sources
--------
-  VUA20  — token-level → aggregated to sentence level (any metaphor ⇒ class 2)
-  MAGPIE — sentence-level idiom detection (figurative ⇒ class 1)
-  FLUTE  — NLI dataset; we use the *hypothesis* of Entailment rows for
-           Idiom/Metaphor/Simile types only, plus each such row's *premise*
-           as a literal example (kept in the same train/test split as its
-           hypothesis to avoid the paraphrase pair leaking across splits).
-           Sarcasm and CreativeParaphrase are excluded (sarcasm is absent
-           from Bloomfield annotations).
+Build a combined sentence-level figurative-language dataset (literal/idiom/metaphor/simile)
+from VUA20, MAGPIE, and FLUTE. FLUTE premise/hypothesis pairs are kept in the same
+train/test split to avoid the paraphrase pair leaking across splits.
 """
 
 from __future__ import annotations

@@ -1,18 +1,4 @@
-"""
-Evaluate CLKD/calibrated checkpoints against the DeepSeek-annotated validation set.
-
-Usage:
-  python scripts/evals/eval_all.py
-  python scripts/evals/eval_all.py --model "TLM+CLKD"
-
-Output files
-------------
-  data/figurative/eval_validation_gold.parquet — the only genuinely held-out
-  evaluation set (footnote-verified gold). There is no "full set" task —
-  every non-gold sentence is now part of the silver training pool, so
-  scoring a silver-trained model against it would be leakage, not a
-  broader validation view.
-"""
+"""Evaluates CLKD/calibrated checkpoints against the footnote-verified gold set, the only subset genuinely held out of training (every other sentence is now part of the silver training pool, so scoring against it would be leakage)."""
 
 from __future__ import annotations
 import argparse
@@ -194,7 +180,7 @@ def task_validation(model: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--model", default=None, help="Only run this one model (by label in _VALIDATION_MODELS)")
     args = p.parse_args()
     task_validation(model=args.model)

@@ -1,15 +1,7 @@
 """
-Compare DeepSeek labels against a model's own predictions.
-
-Reads the outputs of the two independent steps:
-  1. scripts/annotate/deepseek_label_pool.py  → data/figurative/deepseek_labels.parquet
-  2. scripts/annotate/predict_pool.py         → data/figurative/model_predictions.parquet
-joins them on text_cree, and reports the agreement rate (overall, per
-DeepSeek-label, and a full confusion matrix). Run both of those first.
-
-Usage:
-  python scripts/annotate/deepseek_agreement_eval.py
-  python scripts/annotate/deepseek_agreement_eval.py --deepseek-file <path> --model-file <path>
+Compares DeepSeek's pool labels against a trained model's own predictions on
+the same sentences and reports overall/per-label agreement plus a confusion
+matrix.
 """
 
 from __future__ import annotations

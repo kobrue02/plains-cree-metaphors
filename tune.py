@@ -1,27 +1,7 @@
 """
-Single-trial runner for wandb hyperparameter sweeps.
-
-Each invocation runs one trial for one pipeline stage, logging the
-stage-appropriate metric to wandb so the sweep controller can guide
-the next trial via Bayesian optimisation.
-
-Metrics optimised per stage:
-  tlm       → eval/loss                  (minimize)  — TLM held-out MLM/TLM loss
-  clkd      → eval/best_gold_macro_f1    (maximize)  — running-best zero-shot
-                                                        macro F1 on the 228-sentence
-                                                        gold subset (see sweeps/clkd.yaml)
-  calibrate → eval/macro_f1              (maximize)  — macro F1 on held-out annotation split
-  pipeline  → eval/macro_f1              (maximize)  — joint CLKD+Calibrate sweep (recommended)
-
-Usage:
-  # 1. Create a sweep (once per stage):
-  wandb sweep sweeps/pipeline.yaml           # prints <entity/project/sweep_id>
-
-  # 2. Submit N parallel agents on the cluster:
-  sbatch jobs/sweep_agent.sh <sweep_id>      # repeat for desired parallelism
-
-  # 3. Pick best run in wandb UI or:
-  python tune.py --stage calibrate --show-best --sweep-id <sweep_id>
+Single-trial runner for wandb hyperparameter sweeps — runs one trial for one
+pipeline stage and logs the stage-appropriate metric so the sweep controller
+can guide the next trial.
 """
 
 from __future__ import annotations

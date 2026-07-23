@@ -1,29 +1,4 @@
-"""
-Canonical LLM-annotator-vs-gold comparison table — the numbers for "how well
-does each LLM do the dictionary-grounded annotation procedure, judged against
-Bloomfield's 228 footnote-verified gold sentences, under the CURRENT
-(patched) production prompt."
-
-This is the single source of truth for that comparison. Do NOT use the older
-deepseek_on_gold*.parquet / deepseek_on_gold*_summary.parquet files for this —
-those were produced before the idiom-gloss/constructional prompt patch
-existed (src/annotate/figurative_prompt.py) and are frozen at pre-patch
-numbers; they've been moved to data/figurative/_stale_pre_patch/. Every
-number here is instead read straight from each model's
-"patched (dict + gloss, revised prompt)" row in
-scripts/annotate/ablation_llm_grounding.py's own output — the same script
-used for the grounding ablation (paper Section 6.1) — so there is exactly one
-code path that ever computes an LLM's gold performance under the current
-prompt, and both the ablation table and this comparison table read from it.
-
-Requires each model's ablation_llm_grounding*.parquet to already exist (run
-scripts/annotate/ablation_llm_grounding.py --nvidia-model <id> for each model
-first). Models missing that file are skipped with a note, not silently
-dropped from consideration.
-
-Usage:
-  python scripts/evals/llm_annotator_comparison.py
-"""
+"""Builds the canonical table comparing each LLM annotator's dictionary-grounded performance against Bloomfield's footnote-verified gold sentences under the current production prompt, reading results straight from each model's scripts/annotate/ablation_llm_grounding.py output rather than recomputing them."""
 
 from __future__ import annotations
 import os, sys

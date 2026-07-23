@@ -1,12 +1,7 @@
 """
-NVIDIA-hosted model access (https://integrate.api.nvidia.com), for comparing
-other models against DeepSeek on the same figurative-language annotation
-procedure. Uses the same shared prompt as src/annotate/deepseek.py (see
-src/annotate/figurative_prompt.py) — no per-provider prompt drift.
-
-NVIDIA's endpoint is OpenAI-compatible, so this uses the OpenAI SDK (matching
-src/annotate/deepseek.py) rather than raw requests — the SDK retries transient
-errors (429/5xx/timeouts) internally, which a hand-rolled requests.post did not.
+NVIDIA-hosted model access (https://integrate.api.nvidia.com) for comparing other models
+against DeepSeek on the same shared figurative-language annotation prompt. Uses the OpenAI
+SDK, since NVIDIA's endpoint is OpenAI-compatible, so transient errors are retried internally.
 """
 
 from __future__ import annotations

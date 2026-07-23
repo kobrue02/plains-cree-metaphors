@@ -1,23 +1,4 @@
-"""
-CLI wrapper around funcs.figurative_train — fine-tune a sequence classifier on
-VUA20+MAGPIE+FLUTE (English) and push it to the Hub. Used for the "no
-adaptation" and "+TLM" rows of the classifier results table: both are
-English-fine-tuned-then-zero-shot-transferred-to-Cree, differing only in
-whether the encoder went through TLM first. Works with any multilingual
-encoder — pass --encoder/--hub-model-id to point at the one you want.
-
-Usage:
-  # "no adaptation" row for XLM-MLM-100-1280 (the currently missing piece —
-  # its +TLM/+TLM+CLKD checkpoints already exist, see scripts/evals/figurative_results_table.py)
-  python scripts/train/train_figurative_english.py --experiment baseline \
-      --encoder FacebookAI/xlm-mlm-100-1280 \
-      --hub-model-id KonradBRG/xlm-mlm-100-1280-figurative
-
-  # same pattern for a different encoder entirely, e.g. a fresh TLM checkpoint
-  # you haven't fine-tuned on English data yet:
-  python scripts/train/train_figurative_english.py --experiment baseline \
-      --encoder <hf-id-or-local-path> --hub-model-id <KonradBRG/your-name-figurative>
-"""
+"""CLI wrapper around funcs.figurative_train — fine-tune a sequence classifier on VUA20+MAGPIE+FLUTE (English) and push it to the Hub, for the "no adaptation" and "+TLM" rows of the classifier results table."""
 
 from __future__ import annotations
 import argparse, os, sys

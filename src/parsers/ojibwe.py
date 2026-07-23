@@ -1,12 +1,8 @@
 """
-Parser for "Ojibwa Texts" (Jones/Michelson 1917, Vol. VII Part I).
-
-The book is a facing-page dual-language edition: even pages = Ojibwe text
-(with left-margin line numbers 5, 10, 15...), odd pages = English translation.
-The Internet Archive djvu OCR dump alternates pages in sequence, so Ojibwe
-and English paragraphs interleave in the file.
-
-Output: CSV with columns  story, para_idx, text_ojibwe, text_en
+Parser for "Ojibwa Texts" (Jones/Michelson 1917, Vol. VII Part I), a facing-page
+dual-language edition where the Internet Archive djvu OCR dump alternates Ojibwe (even)
+and English (odd) pages in sequence. Outputs a CSV with columns story, para_idx,
+text_ojibwe, text_en.
 """
 
 from __future__ import annotations

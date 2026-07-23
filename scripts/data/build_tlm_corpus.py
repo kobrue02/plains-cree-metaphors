@@ -1,22 +1,4 @@
-"""
-Regenerate all TLM training data sources and consolidate into a single parquet file.
-
-Output files:
-  data/sentences.parquet                 — columns: text_cree, text_en, source
-  data/bloomfield_texts_sentences.parquet — Bloomfield 1934+1930 sentence pool (CLKD + active loop)
-    source values:
-      "bloomfield_1934"   — Plains Cree-English (Bloomfield 1934)
-      "edtekla"           — Plains Cree-English (Teodorescu et al. 2022)
-      "ojibwe"            — Ojibwe-English (Jones & Michelson 1917)
-      "okimasis"          — Plains Cree-English (Okimāsis 2018 textbook)
-      "bloomfield_1930"   — Plains Cree-English (Bloomfield 1930, from DJVU text export)
-
-Usage:
-  python scripts/build_tlm_corpus.py
-  python scripts/build_tlm_corpus.py --skip-bloomfield-scrape   # if parquet already exists
-  python scripts/build_tlm_corpus.py --skip-okimasis     # skip PDF extraction
-  python scripts/build_tlm_corpus.py --skip-bloomfield-1930
-"""
+"""Regenerates all TLM training data sources (Bloomfield, EdTeKLA, Ojibwe, Okimāsis, etc.) and consolidates them into a single sentences parquet file."""
 
 from __future__ import annotations
 import argparse
@@ -80,8 +62,7 @@ def build_ojibwe_df() -> pd.DataFrame:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(description=__doc__,
-                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--skip-bloomfield-scrape", action="store_true",
                    help=f"Skip re-scraping; use existing {BLOOMFIELD_CSV}")
     p.add_argument("--skip-edtekla",          action="store_true")

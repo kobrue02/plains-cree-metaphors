@@ -1,23 +1,8 @@
 """
-Ablation: how much does dictionary grounding — and translation itself —
-contribute to the LLM figurative-language annotation procedure (Section 3.3)?
-
-Three conditions, scored against the same 228 gold sentences used elsewhere:
-  full              Cree + gloss + itwewina dictionary entries — the actual
-                     silver-annotation procedure. Reuses the cached
-                     deepseek_on_gold.parquet run; no new API calls.
-  no_dict           Cree + gloss, no dictionary entries.
-  no_dict_no_gloss  Cree sentence only. Tests whether the model can do this
-                     from pretraining exposure to Cree alone.
-
-The two new conditions use their own adapted system prompt (so the model
-isn't told it has evidence it wasn't actually given), each with its own
-resume-safe JSONL cache.
-
-Usage:
-  python scripts/annotate/ablation_llm_grounding.py
-  python scripts/annotate/ablation_llm_grounding.py --limit 20   # smoke test
-  python scripts/annotate/ablation_llm_grounding.py --workers 8
+Ablation study testing how much dictionary grounding and translation contribute
+to the DeepSeek figurative-language annotation procedure, by scoring three
+conditions (full evidence, no dictionary, Cree-sentence-only) against the same
+228 gold sentences.
 """
 
 from __future__ import annotations
