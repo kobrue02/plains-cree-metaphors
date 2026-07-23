@@ -29,7 +29,7 @@ from src.figurative.data import FigurativeDataset, resolve_use_fast, LABEL_NAMES
 from src.figurative.distill import _freeze_n_layers
 from src.figurative.evaluate import compute_metrics
 from src.figurative.config import FigurativeConfig
-from src.figurative.hierarchical import HierarchicalFigurativeConfig, HierarchicalFigurativeModel
+from src.figurative.hierarchical import HierarchicalFigurativeModel
 
 RESULTS_FILE = "data/figurative/silver_sft_sweep_results.parquet"
 
@@ -127,8 +127,7 @@ def train_on_silver(config: SilverSFTConfig) -> str:
     eval_ds  = FigurativeDataset(eval_recs,  tokenizer, ds_config)
 
     if config.hierarchical:
-        model_config = HierarchicalFigurativeConfig(base_checkpoint=config.checkpoint)
-        model = HierarchicalFigurativeModel(model_config)
+        model = HierarchicalFigurativeModel.from_base_checkpoint(config.checkpoint)
         print(f"[silver_sft] hierarchical head: binary (literal/figurative) "
               f"+ conditional 3-way (idiom/metaphor/simile)")
     else:

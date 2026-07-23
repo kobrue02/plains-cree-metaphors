@@ -17,7 +17,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from transformers import AutoModel, PretrainedConfig, PreTrainedModel
+from transformers import AutoConfig, AutoModel, PretrainedConfig, PreTrainedModel
 from transformers.modeling_outputs import SequenceClassifierOutput
 
 # Inlined rather than imported from src.figurative.data: this file is pushed
@@ -46,12 +46,37 @@ class HierarchicalFigurativeModel(PreTrainedModel):
 
     def __init__(self, config: HierarchicalFigurativeConfig):
         super().__init__(config)
-        self.encoder = AutoModel.from_pretrained(config.base_checkpoint)
+        # Built as an empty shell via from_config, NOT from_pretrained: this
+        # ctor also runs when PreTrainedModel.from_pretrained() reconstructs
+        # the model under a meta-device context to reload a saved checkpoint
+        # (see push_best_silver_sft.py) — calling from_pretrained() again in
+        # here trips transformers' "from_pretrained nested under a meta
+        # context" anti-pattern check. Real pretrained encoder weights for a
+        # *fresh* run are loaded separately, by from_base_checkpoint() below.
+        # torch_dtype is pinned to fp32 regardless of path: some base
+        # checkpoints (e.g. the raw, non-TLM-adapted FacebookAI/xlm-mlm-100-1280)
+        # load natively in fp16, while binary_head/type_head default to fp32 —
+        # mixing the two crashes MPS matmul with a dtype-mismatch assertion.
+        encoder_config = AutoConfig.from_pretrained(config.base_checkpoint)
+        self.encoder = AutoModel.from_config(encoder_config, torch_dtype=torch.float32)
         hidden_size = self.encoder.config.hidden_size
         self.dropout = nn.Dropout(config.dropout)
         self.binary_head = nn.Linear(hidden_size, 1)
         self.type_head = nn.Linear(hidden_size, NUM_TYPE_LABELS)
         self.post_init()
+
+    @classmethod
+    def from_base_checkpoint(cls, base_checkpoint: str, dropout: float = 0.1) -> "HierarchicalFigurativeModel":
+        """Build a fresh model for training, with the encoder's real pretrained
+        weights loaded in — use this (not the bare constructor) whenever
+        starting from a base checkpoint rather than reloading an already-saved
+        HierarchicalFigurativeModel (for which plain .from_pretrained() is
+        correct and sufficient)."""
+        config = HierarchicalFigurativeConfig(base_checkpoint=base_checkpoint, dropout=dropout)
+        model = cls(config)
+        pretrained_encoder = AutoModel.from_pretrained(base_checkpoint, torch_dtype=torch.float32)
+        model.encoder.load_state_dict(pretrained_encoder.state_dict())
+        return model
 
     def _init_weights(self, module):
         pass  # encoder arrives pretrained; heads keep nn.Linear's default init

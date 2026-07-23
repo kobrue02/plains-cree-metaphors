@@ -3,12 +3,15 @@ Evaluate CLKD/calibrated checkpoints against the DeepSeek-annotated validation s
 
 Usage:
   python scripts/evals/eval_all.py
-  python scripts/evals/eval_all.py --model "XLM-MLM CLKD (pre-calibration)"
+  python scripts/evals/eval_all.py --model "TLM+CLKD"
 
 Output files
 ------------
-  data/figurative/eval_validation_full.parquet — validation task (full set)
-  data/figurative/eval_validation_gold.parquet — validation task (gold subset)
+  data/figurative/eval_validation_gold.parquet — the only genuinely held-out
+  evaluation set (footnote-verified gold). There is no "full set" task —
+  every non-gold sentence is now part of the silver training pool, so
+  scoring a silver-trained model against it would be leakage, not a
+  broader validation view.
 """
 
 from __future__ import annotations
@@ -45,6 +48,21 @@ def metrics_for(y_true: list[str], y_pred: list[str]) -> dict:
     return row
 
 
+def _save_or_merge(path: str, new_rows: list[dict], key_col: str = "model") -> None:
+    """Upsert new_rows into path by key_col, keeping every other existing row —
+    so `--model X` only touches X's row instead of wiping out every other
+    model's already-computed result (a plain overwrite did that before)."""
+    new_df = pd.DataFrame(new_rows)
+    if os.path.exists(path):
+        old_df = pd.read_parquet(path)
+        keys = set(new_df[key_col])
+        old_df = old_df[~old_df[key_col].isin(keys)]
+        merged = pd.concat([old_df, new_df], ignore_index=True)
+    else:
+        merged = new_df
+    merged.to_parquet(path, index=False)
+
+
 def bootstrap_ci(y_true: list[str], y_pred: list[str],
                   metric_keys: tuple[str, ...] = ("macro_f1", "f1_idiom", "f1_metaphor", "f1_simile"),
                   n_boot: int = 2000, seed: int = 42, ci: float = 0.95) -> dict:
@@ -77,45 +95,23 @@ def bootstrap_ci(y_true: list[str], y_pred: list[str],
 # ── Shared model list ────────────────────────────────────────────────────────
 
 _VALIDATION_MODELS = [
-    ("XLM-R base",            "KonradBRG/xlm-r-plains-cree-en-tlm-figurative"),
-    ("XLM-MLM CLKD f12",      "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12"),
-    ("XLM-MLM CLKD full",     "KonradBRG/xlm-mlm-100-1280-plains-cree-en-clkd-full"),
-    ("Glot500 CLKD direct",   "KonradBRG/glot500-base-plains-cree-en-clkd-direct"),
-    ("Glot500 CLKD + TLM",    "KonradBRG/glot500-base-plains-cree-en-clkd-tlm"),
-    ("XLM-V CLKD direct",     "KonradBRG/xlm-v-base-plains-cree-en-clkd-direct"),
-    # ── CLKD, pre-calibration — base pipeline (pipeline.py), matched lineage with
-    # the calibrated entries right below, for a clean does-calibration-help check ──
-    ("XLM-MLM CLKD (pre-calibration)", "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
-    ("XLM-V CLKD (pre-calibration)",   "KonradBRG/xlm-v-plains-cree-en-clkd"),
-    # ── calibrated — base pipeline (pipeline.py) ──────────────────────────────
-    ("XLM-MLM calibrated",    "KonradBRG/xlm-mlm-plains-cree-en-calibrated"),
-    ("Glot500 calibrated",    "KonradBRG/glot500-plains-cree-en-calibrated"),
-    ("XLM-V calibrated",      "KonradBRG/xlm-v-plains-cree-en-calibrated"),
-    # ── calibrated — ablation study (jobs/ablation.sh, xlm-mlm base) ──────────
-    ("Ablation: full",            "KonradBRG/xlm-mlm-abl-full-plains-cree-en-calibrated"),
-    ("Ablation: no TLM",          "KonradBRG/xlm-mlm-abl-no-tlm-plains-cree-en-calibrated"),
-    ("Ablation: no CLKD",         "KonradBRG/xlm-mlm-abl-no-clkd-plains-cree-en-calibrated"),
-    ("Ablation: neither",         "KonradBRG/xlm-mlm-abl-neither-plains-cree-en-calibrated"),
-    ("Ablation: mono-MLM warmup", "KonradBRG/xlm-mlm-abl-mono-mlm-plains-cree-en-calibrated"),
-    ("Ablation: TLM+contrastive", "KonradBRG/xlm-mlm-abl-tlm-contrastive-plains-cree-en-calibrated"),
-    # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
-    # alpha=0.0 is "Ablation: full" above; alpha=0.1 is "Ablation: TLM+contrastive"
-    ("Contrastive α=0.05", "KonradBRG/xlm-mlm-alpha-0p05-plains-cree-en-calibrated"),
-    ("Contrastive α=0.15", "KonradBRG/xlm-mlm-alpha-0p15-plains-cree-en-calibrated"),
-    ("Contrastive α=0.2",  "KonradBRG/xlm-mlm-alpha-0p2-plains-cree-en-calibrated"),
-    ("Contrastive α=0.3",  "KonradBRG/xlm-mlm-alpha-0p3-plains-cree-en-calibrated"),
-    ("Contrastive α=0.4",  "KonradBRG/xlm-mlm-alpha-0p4-plains-cree-en-calibrated"),
-    ("Contrastive α=0.5",  "KonradBRG/xlm-mlm-alpha-0p5-plains-cree-en-calibrated"),
-    ("Contrastive α=0.75", "KonradBRG/xlm-mlm-alpha-0p75-plains-cree-en-calibrated"),
-    ("Contrastive α=1.0",  "KonradBRG/xlm-mlm-alpha-1p0-plains-cree-en-calibrated"),
     # ── ceiling baseline: the CLKD teacher scored on the English glosses rather
     # than the Cree text — bounds how much of the students' error is inherited
     # teacher weakness (idiom/metaphor/simile) vs. added cross-lingual-transfer loss ──
     ("Teacher-on-glosses (English ceiling)", "KonradBRG/deberta-v3-base-figurative", "text_en"),
     # ── TLM+CLKD vs. TLM+Silver-SFT comparison (Sections 3/4 of the paper) ──
-    ("TLM+CLKD",                 "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
-    ("TLM+Silver-SFT (hierarchical)", "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-hierarchical"),
+    ("TLM+CLKD",                       "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
+    ("TLM+Silver-SFT (hierarchical)",  "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-hierarchical"),
+    # ── raw encoder ablation: silver-SFT directly from the base (non-TLM-adapted)
+    # encoder — isolates whether TLM adaptation itself matters, or silver
+    # labels alone carry the classifier (Section 6.2's evaluation paragraph) ──
+    ("Silver-SFT, no TLM adaptation",  "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-no-tlm"),
 ]
+# NOTE: every other entry that used to live here (XLM-R/Glot500/XLM-V variants,
+# the calibrated/ablation/contrastive-alpha checkpoints) pointed at Hub
+# repos deleted during the project cleanup once the CV-on-gold/calibration
+# pipeline and multi-encoder comparison were dropped from the paper's scope —
+# removed rather than left to fail with 401/404s on every run.
 
 # alpha -> (label in _VALIDATION_MODELS, calibrated repo_id) — used by
 # scripts/viz/generate_figures.py to build the contrastive-alpha line plot.
@@ -138,8 +134,13 @@ ANNOT_FILE = "data/figurative/bloomfield_annotated.parquet"
 # ── Task: validation ──────────────────────────────────────────────────────────
 
 def task_validation(model: str | None = None) -> None:
-    """Evaluate CLKD/calibrated models against the DeepSeek-annotated validation set."""
-    output_full = "data/figurative/eval_validation_full.parquet"
+    """Evaluate models against the gold (footnote-verified) set — the only subset
+    that's genuinely held out. There used to also be a "full validation set"
+    (gold + the non-footnote-verified rows of bloomfield_annotated.parquet),
+    but those non-gold rows are now part of the silver training pool itself
+    (see silver_sft.py) — scoring Silver-SFT against them would be leakage,
+    not a weaker validation view, so that task was removed rather than kept
+    as a second, contaminated number alongside the honest one."""
     output_gold = "data/figurative/eval_validation_gold.parquet"
 
     models = _VALIDATION_MODELS if model is None else [
@@ -176,9 +177,6 @@ def task_validation(model: str | None = None) -> None:
 
         return rows
 
-    # NOTE: these models were calibrated on (subsets of) this same annotation pool,
-    # so this is an in-sample sanity check, not a held-out evaluation — see
-    # scripts/evals/eval_cv.py for the honest cross-validated numbers.
     annot = pd.read_parquet(ANNOT_FILE)
     annot = annot.dropna(subset=["text_cree", "label"])
     # normalise label column (in case of stray whitespace)
@@ -188,22 +186,14 @@ def task_validation(model: str | None = None) -> None:
 
     gold = annot[annot["footnote_applies"] == True]
 
-    print("NOTE: in-sample sanity check, not held-out — see eval_cv.py for CV numbers")
-    print(f"Full validation set : {len(annot)} sentences")
-    print(f"  label dist: {annot['label'].value_counts().to_dict()}")
     print(f"Gold subset (footnote_applies=True): {len(gold)} sentences")
     print(f"  label dist: {gold['label'].value_counts().to_dict()}")
 
     os.makedirs("data/figurative", exist_ok=True)
 
-    print("\n\n── Full validation set ──────────────────────────────────────")
-    rows_full = evaluate(annot, "full")
-    pd.DataFrame(rows_full).to_parquet(output_full, index=False)
-    print(f"\nSaved → {output_full}")
-
     print("\n\n── Gold subset (footnote_applies=True) ──────────────────────")
     rows_gold = evaluate(gold, "gold")
-    pd.DataFrame(rows_gold).to_parquet(output_gold, index=False)
+    _save_or_merge(output_gold, rows_gold)
     print(f"\nSaved → {output_gold}")
 
 
