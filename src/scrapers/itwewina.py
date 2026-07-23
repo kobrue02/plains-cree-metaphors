@@ -37,10 +37,8 @@ _SKIP = re.compile(
     re.IGNORECASE,
 )
 
-
 def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
-
 
 def _parse_results(html: str) -> list[dict]:
     soup = BeautifulSoup(html, "html.parser")
@@ -83,7 +81,6 @@ def _parse_results(html: str) -> list[dict]:
 
     return entries
 
-
 @lru_cache(maxsize=2048)
 def lookup(word: str, delay: float = 0.3) -> list[dict]:
     """Return dictionary entries for *word*, cached in-process; *delay* is a polite inter-request pause."""
@@ -96,12 +93,10 @@ def lookup(word: str, delay: float = 0.3) -> list[dict]:
         print(f"  [itwewina] lookup failed for {word!r}: {exc}")
         return []
 
-
 def _tokenise(sentence: str) -> list[str]:
     """Split a Cree sentence into content-word tokens, stripping punctuation."""
     tokens = re.findall(r"[a-zA-ZâêîôâÂÊÎÔāēīōĀĒĪŌ'ʼ\-]+", sentence)
     return [t.lower() for t in tokens if len(t) >= 3 and not _SKIP.match(t)]
-
 
 def _normalize(s: str) -> str:
     """Strip vowel-length diacritics (â/ê/î/ô) for lenient matching. Bloomfield-era/
@@ -115,7 +110,6 @@ def _normalize(s: str) -> str:
     return "".join(
         c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn"
     ).lower()
-
 
 def lookup_sentence(
     sentence: str,
@@ -136,7 +130,6 @@ def lookup_sentence(
         if entries:
             results[tok] = entries
     return results
-
 
 def format_for_prompt(
     cree: str,
@@ -164,9 +157,6 @@ def format_for_prompt(
         "Answer: literal / metaphor / idiom / simile",
     ]
     return "\n".join(lines)
-
-
-# ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import argparse, json

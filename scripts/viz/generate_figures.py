@@ -71,17 +71,14 @@ ALPHA_SWEEP = [
 
 written_figures: list[str] = []
 
-
 def skip(name: str, reason: str) -> None:
     print(f"SKIPPED {name} — {reason}")
-
 
 def emit(path: str, content: str) -> None:
     with open(path, "w") as f:
         f.write(content)
     written_figures.append(os.path.splitext(os.path.basename(path))[0])
     print(f"Wrote {path}")
-
 
 def load_rows(parquet_path: str, models: list[str]) -> pd.DataFrame | None:
     """Read `parquet_path` and return rows indexed by model, or None (with a
@@ -98,10 +95,6 @@ def load_rows(parquet_path: str, models: list[str]) -> pd.DataFrame | None:
         print(f"  missing/failed rows: {', '.join(missing)}")
         return None
     return df
-
-
-
-# ── figure 1: per-class F1 heatmap across ablation conditions ─────────────────
 
 def make_ablation_heatmap() -> None:
     name = "ablation_heatmap"
@@ -170,9 +163,6 @@ def make_ablation_heatmap() -> None:
 """
     emit(f"figures/{name}.tex", content)
 
-
-# ── figure 2: ablation macro-F1, grouped by role (baseline / removed / added) ──
-
 def make_ablation_macro_f1() -> None:
     name = "ablation_macro_f1"
     models = [m for m, _, _ in ABLATION_CONDITIONS]
@@ -228,9 +218,6 @@ def make_ablation_macro_f1() -> None:
 """
     emit(f"figures/{name}.tex", content)
 
-
-# ── figure 3: impact of the InfoNCE contrastive loss, per class ───────────────
-
 def make_contrastive_impact() -> None:
     name = "contrastive_impact"
     series = [
@@ -283,9 +270,6 @@ def make_contrastive_impact() -> None:
 """
     emit(f"figures/{name}.tex", content)
 
-
-# ── figure 4: contrastive alpha sweep — macro F1 vs. InfoNCE weight ───────────
-
 def make_alpha_sweep() -> None:
     name = "contrastive_alpha_sweep"
     models = [model for _, model in ALPHA_SWEEP]
@@ -331,16 +315,10 @@ def make_alpha_sweep() -> None:
 """
     emit(f"figures/{name}.tex", content)
 
-
-# ── run ─────────────────────────────────────────────────────────────────────────
-
 make_ablation_heatmap()
 make_ablation_macro_f1()
 make_contrastive_impact()
 make_alpha_sweep()
-
-
-# ── standalone compile wrapper (only figures that were actually written) ──────
 
 LAYOUT = [
     ("ablation_heatmap",        None),

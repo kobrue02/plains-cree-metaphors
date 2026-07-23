@@ -92,19 +92,17 @@ def bootstrap_ci(y_true: list[str], y_pred: list[str],
     return out
 
 
-# ── Shared model list ────────────────────────────────────────────────────────
-
 _VALIDATION_MODELS = [
-    # ── ceiling baseline: the CLKD teacher scored on the English glosses rather
+    # ceiling baseline: the CLKD teacher scored on the English glosses rather
     # than the Cree text — bounds how much of the students' error is inherited
-    # teacher weakness (idiom/metaphor/simile) vs. added cross-lingual-transfer loss ──
+    # teacher weakness (idiom/metaphor/simile) vs. added cross-lingual-transfer loss
     ("Teacher-on-glosses (English ceiling)", "KonradBRG/deberta-v3-base-figurative", "text_en"),
-    # ── TLM+CLKD vs. TLM+Silver-SFT comparison (Sections 3/4 of the paper) ──
+    # TLM+CLKD vs. TLM+Silver-SFT comparison (Sections 3/4 of the paper)
     ("TLM+CLKD",                       "KonradBRG/xlm-mlm-plains-cree-en-clkd"),
     ("TLM+Silver-SFT (hierarchical)",  "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-hierarchical"),
-    # ── raw encoder ablation: silver-SFT directly from the base (non-TLM-adapted)
+    # raw encoder ablation: silver-SFT directly from the base (non-TLM-adapted)
     # encoder — isolates whether TLM adaptation itself matters, or silver
-    # labels alone carry the classifier (Section 6.2's evaluation paragraph) ──
+    # labels alone carry the classifier (Section 6.2's evaluation paragraph)
     ("Silver-SFT, no TLM adaptation",  "KonradBRG/xlm-mlm-plains-cree-en-silver-sft-no-tlm"),
 ]
 # NOTE: every other entry that used to live here (XLM-R/Glot500/XLM-V variants,
@@ -130,8 +128,6 @@ ALPHA_SWEEP = [
 
 ANNOT_FILE = "data/figurative/bloomfield_annotated.parquet"
 
-
-# ── Task: validation ──────────────────────────────────────────────────────────
 
 def task_validation(model: str | None = None) -> None:
     """Evaluate models against the gold (footnote-verified) set — the only subset

@@ -43,13 +43,9 @@ SIMILE   = 3
 LABEL_NAMES = ["literal", "idiom", "metaphor", "simile"]
 NUM_LABELS  = len(LABEL_NAMES)
 
-
 def resolve_use_fast(checkpoint: str) -> bool:
     """deberta-v3 fast tokenizers are broken in recent transformers (tiktoken misparses the spm file as bpe)."""
     return "deberta-v3" not in checkpoint.lower()
-
-
-# ── raw loaders ───────────────────────────────────────────────────────────────
 
 def _load_vua20_sentences(split: str, min_metaphor_tokens: int = 2) -> list[dict]:
     """min_metaphor_tokens=2, not VUA20's original "any single token" rule —
@@ -68,7 +64,6 @@ def _load_vua20_sentences(split: str, min_metaphor_tokens: int = 2) -> list[dict
         label = METAPHOR if sum(l == 1 for l in labels) >= min_metaphor_tokens else LITERAL
         result.append({"text": sentence, "label": label})
     return result
-
 
 def _load_flute() -> tuple[list[dict], list[dict]]:
     """Extract figurative sentences from FLUTE; uses hypothesis of Entailment rows only
@@ -101,7 +96,6 @@ def _load_flute() -> tuple[list[dict], list[dict]]:
 
     return _to_records(train_pairs), _to_records(test_pairs)
 
-
 def _load_magpie() -> tuple[list[dict], list[dict]]:
     path = hf_hub_download("gsarti/magpie", "magpie.tsv", repo_type="dataset")
     df = pd.read_csv(path, sep="\t")
@@ -119,9 +113,6 @@ def _load_magpie() -> tuple[list[dict], list[dict]]:
         stratify=[r["label"] for r in records],
     )
     return train_data, test_data
-
-
-# ── dataset ───────────────────────────────────────────────────────────────────
 
 class FigurativeDataset(Dataset):
     def __init__(
@@ -150,7 +141,6 @@ class FigurativeDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict:
         return self.encodings[idx]
-
 
 def build_datasets(
     tokenizer: PreTrainedTokenizerFast,
@@ -190,7 +180,6 @@ def build_datasets(
         FigurativeDataset(train_records, tokenizer, config),
         FigurativeDataset(test_records,  tokenizer, config),
     )
-
 
 def class_weights_from(dataset: FigurativeDataset) -> torch.Tensor:
     """Inverse-frequency weights for the 4-class imbalance."""

@@ -93,7 +93,6 @@ def _extract_pairs(text: str) -> list[tuple[str, str]]:
             i += 1
             continue
 
-        # ── Pattern A: numbered example on a single line ───────────────────
         m = _NUM_LINE.match(raw)
         if m:
             content = m.group(1).strip()
@@ -116,7 +115,6 @@ def _extract_pairs(text: str) -> list[tuple[str, str]]:
             i += 1
             continue
 
-        # ── Pattern B: unnumbered Cree line followed by English line ────────
         if _is_cree_dominant(stripped) and not _PROSE.match(stripped):
             pair = _split_inline(stripped)
             if pair:

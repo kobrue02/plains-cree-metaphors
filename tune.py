@@ -36,9 +36,6 @@ SENTENCES_FILE = "data/sentences.parquet"
 CORPUS_FILE    = "data/bloomfield_texts_sentences.parquet"
 ANNOT_FILE     = "data/figurative/bloomfield_annotated.parquet"
 
-
-# ── Stage runners ──────────────────────────────────────────────────────────────
-
 def run_tlm(args: argparse.Namespace) -> None:
     from funcs import fine_tune
     wandb.init(project=WANDB_PROJECT)
@@ -55,7 +52,6 @@ def run_tlm(args: argparse.Namespace) -> None:
         max_length=args.max_length,
         wandb_project=WANDB_PROJECT,
     )
-
 
 def run_clkd(args: argparse.Namespace) -> None:
     from funcs import figurative_distill
@@ -77,7 +73,6 @@ def run_clkd(args: argparse.Namespace) -> None:
         wandb_project=WANDB_PROJECT,
     )
 
-
 def run_calibrate(args: argparse.Namespace) -> None:
     from funcs import calibrate
     wandb.init(project=WANDB_PROJECT)
@@ -94,7 +89,6 @@ def run_calibrate(args: argparse.Namespace) -> None:
         max_length=args.max_length,
         wandb_project=WANDB_PROJECT,
     )
-
 
 def run_pipeline(args: argparse.Namespace) -> None:
     """Joint CLKD → Calibrate sweep trial; swept jointly because freeze_n_layers couples both stages."""
@@ -138,9 +132,6 @@ def run_pipeline(args: argparse.Namespace) -> None:
         shutil.rmtree(clkd_dir, ignore_errors=True)
         shutil.rmtree(cal_dir, ignore_errors=True)
 
-
-# ── Entry point ────────────────────────────────────────────────────────────────
-
 def main() -> None:
     p = argparse.ArgumentParser(
         description="One sweep trial for a single pipeline stage",
@@ -182,7 +173,6 @@ def main() -> None:
         if not args.tlm_ckpt:
             p.error("--tlm-ckpt is required for --stage pipeline")
         run_pipeline(args)
-
 
 if __name__ == "__main__":
     main()

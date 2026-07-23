@@ -16,8 +16,6 @@ import sys
 from pathlib import Path
 from dataclasses import dataclass, field
 
-# ── Language detection ─────────────────────────────────────────────────────────
-
 # strong ojibwe markers: vowel-apostrophe clusters, affricates tc/dc, subscript digits, /u /i encodings
 _OJI_RE = re.compile(
     r"[aeiou]['''][a-z]"          # vowel-apostrophe (a'pi, o'o')
@@ -50,14 +48,11 @@ _SERIES_RE = re.compile(r"^(SERIES|PART|I\s*[.—-]|II\s*[.—-])", re.IGNORECAS
 # footnote: short line starting with a digit (e.g. "1 Saga'a'man, 'when you go out'")
 _FOOTNOTE_RE = re.compile(r"^\d+\s+\S")
 
-
 def _ojibwe_score(text: str) -> int:
     return len(_OJI_RE.findall(text))
 
-
 def _english_score(text: str) -> int:
     return len(_EN_WORDS.findall(text))
-
 
 def classify_block(raw: str) -> str:
     """Return 'ojibwe' | 'english' | 'header' | 'meta' | 'footnote'."""
@@ -86,11 +81,7 @@ def classify_block(raw: str) -> str:
         return "meta"
     return "ojibwe" if oji >= eng else "english"
 
-
-# ── Text cleaning ──────────────────────────────────────────────────────────────
-
 _MARGIN_NUM_RE = re.compile(r"(?m)^\s*\d+\s{2,}")  # e.g. "5   " at line start
-
 
 def clean_block(raw: str) -> str:
     """Normalize OCR artifacts in a paragraph."""
@@ -100,22 +91,17 @@ def clean_block(raw: str) -> str:
     text = re.sub(r"\s*\n\s*", " ", text)
     return text.strip()
 
-
 def strip_header(text: str) -> str:
     """Normalize a story header to a stable key."""
     t = re.sub(r"\s+", " ", text).strip()
     t = re.sub(r"\d+\s*$", "", t).strip().rstrip(".")
     return t.upper()
 
-
-# ── Parser ─────────────────────────────────────────────────────────────────────
-
 @dataclass
 class Story:
     title: str
     ojibwe: list[str] = field(default_factory=list)
     english: list[str] = field(default_factory=list)
-
 
 def parse(path: str | Path) -> list[Story]:
     raw = Path(path).read_text(encoding="utf-8", errors="replace")
@@ -155,9 +141,6 @@ def parse(path: str | Path) -> list[Story]:
     stories.pop("__preamble__", None)
     return list(stories.values())
 
-
-# ── Output ─────────────────────────────────────────────────────────────────────
-
 def to_parquet(stories: list[Story], out_path: str | Path) -> None:
     import pandas as pd
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -169,7 +152,6 @@ def to_parquet(stories: list[Story], out_path: str | Path) -> None:
                          "text_ojibwe": oji, "text_en": eng})
     pd.DataFrame(rows).to_parquet(out_path, index=False)
 
-
 def to_parallel(stories: list[Story], out_path: str | Path) -> None:
     """Write src ||| tgt format for TLM fine-tuning."""
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
@@ -177,7 +159,6 @@ def to_parallel(stories: list[Story], out_path: str | Path) -> None:
         for story in stories:
             for oji, eng in zip(story.ojibwe, story.english):
                 f.write(f"{oji} ||| {eng}\n")
-
 
 def to_parallel_df(stories: list[Story]) -> "pd.DataFrame":
     """Return a DataFrame with text_cree and text_en columns (no file I/O)."""
@@ -187,9 +168,6 @@ def to_parallel_df(stories: list[Story]) -> "pd.DataFrame":
         for oji, eng in zip(story.ojibwe, story.english):
             rows.append({"text_cree": oji, "text_en": eng})
     return pd.DataFrame(rows)
-
-
-# ── CLI ────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     import argparse

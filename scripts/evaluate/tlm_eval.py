@@ -34,9 +34,6 @@ SENTENCES_FILE = "data/sentences.parquet"
 DEFAULT_N      = 500   # evaluation pairs (randomly sampled from held-out split)
 SEED           = 42
 
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
 def evaluate(model_name: str, cree: list[str], en: list[str], device: str) -> dict:
     print(f"\n  Loading {model_name} ...")
     tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -59,7 +56,6 @@ def evaluate(model_name: str, cree: list[str], en: list[str], device: str) -> di
         "retrieval": retr,
     }
 
-
 def print_results(label: str, res: dict) -> None:
     print(f"\n{'─'*58}")
     print(f"  {label}")
@@ -68,7 +64,6 @@ def print_results(label: str, res: dict) -> None:
     print(f"               EN   : {res['ppl_en']:.2f}")
     for direction, m in res["retrieval"].items():
         print(f"  {direction:<10}  R@1={m['R@1']:.3f}  R@5={m['R@5']:.3f}  MRR={m['MRR']:.3f}")
-
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
@@ -116,7 +111,6 @@ def main() -> None:
                 delta = tlm["retrieval"][direction][k] - base["retrieval"][direction][k]
                 print(f"  {direction:<10}  {k}: {delta:+.3f}")
     print()
-
 
 if __name__ == "__main__":
     main()

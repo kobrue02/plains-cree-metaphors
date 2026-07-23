@@ -204,7 +204,6 @@ Final deployed checkpoint for figurative language detection in Plains Cree.
 
 MODELS = [
 
-    # ── TLM checkpoints — legacy (predate pipeline.py's short model-id naming) ──
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-tlm",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -224,7 +223,6 @@ MODELS = [
         stage_kwargs = dict(epochs=15, max_length=128),
     ),
 
-    # ── TLM checkpoints — base pipeline (pipeline.py --model-id xlm-mlm/xlm-v) ──
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-plains-cree-en-tlm",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -238,7 +236,6 @@ MODELS = [
         stage_kwargs = dict(epochs=15, max_length=128),
     ),
 
-    # ── Figurative classifiers (English teacher / baselines) ──────────────────
     dict(
         repo_id         = f"{AUTHOR}/deberta-v3-base-figurative",
         base_model      = "microsoft/deberta-v3-base",
@@ -316,7 +313,6 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
 """,
     ),
 
-    # ── CLKD models (legacy hand-run naming, predates pipeline.py) ─────────────
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-100-1280-plains-cree-en-clkd-frozen12",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -354,7 +350,6 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
         stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-v-base-plains-cree-en-tlm"),
     ),
 
-    # ── CLKD models — base pipeline (pipeline.py --model-id xlm-mlm/xlm-v) ──────
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-plains-cree-en-clkd",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -368,7 +363,6 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
         stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-v-plains-cree-en-tlm"),
     ),
 
-    # ── Calibrated models — base pipeline (pipeline.py, --model-id xlm-mlm/glot500/xlm-v) ──
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-plains-cree-en-calibrated",
         base_model   = "FacebookAI/xlm-mlm-100-1280",
@@ -388,7 +382,6 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
         stage_kwargs = dict(student_base=f"{AUTHOR}/xlm-v-plains-cree-en-clkd"),
     ),
 
-    # ── Calibrated models — ablation study (jobs/ablation.sh, base model: xlm-mlm-100-1280) ──
     dict(
         repo_id      = f"{AUTHOR}/xlm-mlm-abl-full-plains-cree-en-calibrated",
         base_model   = "FacebookAI/xlm-mlm-100-1280",

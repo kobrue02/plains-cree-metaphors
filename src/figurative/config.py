@@ -3,14 +3,11 @@
 from dataclasses import dataclass
 import os
 
-
 @dataclass
 class FigurativeConfig:
 
-    # ── Encoder ───────────────────────────────────────────────────────────────
     encoder: str = "KonradBRG/xlm-r-plains-cree-en-tlm"
 
-    # ── Training ──────────────────────────────────────────────────────────────
     max_length:    int   = 128
     batch_size:    int   = 32
     grad_accum:    int   = 1
@@ -22,20 +19,15 @@ class FigurativeConfig:
     freeze_encoder:       bool  = False
     gradient_checkpointing: bool = True
 
-    # ── Logging & Hub ─────────────────────────────────────────────────────────
     wandb_project: str | None = None
     hub_model_id:  str | None = None
 
-    # ── Output ────────────────────────────────────────────────────────────────
     experiment_name: str = "figurative_3class"
     output_root:     str = "data/figurative"
 
     @property
     def checkpoint_dir(self) -> str:
         return os.path.join(self.output_root, self.experiment_name)
-
-
-# ── Named presets ─────────────────────────────────────────────────────────────
 
 def tlm_base() -> FigurativeConfig:
     """TLM-adapted XLM-R base fine-tuned on VUA20+MAGPIE+FLUTE."""
@@ -45,7 +37,6 @@ def tlm_base() -> FigurativeConfig:
         wandb_project="fnlp-figurative",
         hub_model_id="KonradBRG/xlm-r-plains-cree-en-tlm-figurative",
     )
-
 
 def tlm_large() -> FigurativeConfig:
     """TLM-adapted XLM-R large fine-tuned on VUA20+MAGPIE+FLUTE."""
@@ -57,7 +48,6 @@ def tlm_large() -> FigurativeConfig:
         wandb_project="fnlp-figurative",
         hub_model_id="KonradBRG/xlm-r-large-plains-cree-en-tlm-figurative",
     )
-
 
 def tlm_xlm() -> FigurativeConfig:
     """XLM-MLM-100-1280 TLM-adapted encoder fine-tuned on VUA20+MAGPIE+FLUTE."""
@@ -71,7 +61,6 @@ def tlm_xlm() -> FigurativeConfig:
         hub_model_id="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm-figurative",
     )
 
-
 def deberta_teacher() -> FigurativeConfig:
     """DeBERTa-v3-base fine-tuned on VUA20+MAGPIE+FLUTE — English-only teacher."""
     return FigurativeConfig(
@@ -82,7 +71,6 @@ def deberta_teacher() -> FigurativeConfig:
         wandb_project="fnlp-figurative",
         hub_model_id="KonradBRG/deberta-v3-base-figurative",
     )
-
 
 def baseline() -> FigurativeConfig:
     """Vanilla multilingual base encoder — control condition, no Cree-specific

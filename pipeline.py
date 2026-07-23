@@ -143,7 +143,6 @@ def main() -> None:
     prefix   = args.hub_prefix
     mid      = args.model_id
 
-    # ── derived paths ──────────────────────────────────────────────────────────
     mono_local  = local_dir(mid, "mono")
     tlm_local   = local_dir(mid, "tlm")
     clkd_local  = local_dir(mid, "clkd")
@@ -153,7 +152,6 @@ def main() -> None:
     clkd_hub = hub_id(prefix, mid, "clkd")
     cal_hub  = hub_id(prefix, mid, "figurative")
 
-    # ── Stage 0: Monolingual Cree MLM (ablation only) ─────────────────────────
     # if run, stage 1 starts from this checkpoint instead of the base model
     tlm_base = args.base_model
     if args.mono_mlm:
@@ -173,7 +171,6 @@ def main() -> None:
         )
         tlm_base = mono_local
 
-    # ── Stage 1: TLM ──────────────────────────────────────────────────────────
     if not args.skip_tlm:
         print(f"\n{'='*60}\n  Stage 1 · TLM  ({tlm_base})\n{'='*60}")
         fine_tune(
@@ -203,7 +200,6 @@ def main() -> None:
         tlm_ckpt = tlm_local if os.path.isdir(tlm_local) else tlm_hub
         print(f"\nSkipping TLM — using checkpoint: {tlm_ckpt}")
 
-    # ── Stage 2: CLKD ─────────────────────────────────────────────────────────
     if not args.skip_clkd:
         clkd_input = args.clkd_from if args.clkd_from else tlm_ckpt
         print(f"\n{'='*60}\n  Stage 2 · CLKD  ({clkd_input})\n{'='*60}")
@@ -234,7 +230,6 @@ def main() -> None:
         clkd_ckpt = clkd_local if os.path.isdir(clkd_local) else clkd_hub
         print(f"\nSkipping CLKD — using checkpoint: {clkd_ckpt}")
 
-    # ── Stage 3: Calibrate ────────────────────────────────────────────────────
     if not args.skip_calibrate:
         is_cv_run = args.holdout_fold is not None
         if is_cv_run:

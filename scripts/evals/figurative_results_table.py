@@ -64,7 +64,6 @@ GOLD_FILE   = "data/figurative/bloomfield_annotated.parquet"
 N_FOLDS     = 5
 OUTPUT_FILE = "data/figurative/figurative_results_table.parquet"
 
-
 def load_gold(footnoted_only: bool) -> pd.DataFrame:
     df = pd.read_parquet(GOLD_FILE)
     if footnoted_only:
@@ -75,20 +74,13 @@ def load_gold(footnoted_only: bool) -> pd.DataFrame:
     )
     return df
 
-
 def fold_dir(model_id: str, fold: int) -> str:
     return f"data/calibrated_{model_id}-fold{fold}"
-
-
-# ── Row: Majority class ────────────────────────────────────────────────────────
 
 def eval_majority(gold: pd.DataFrame) -> dict:
     y_true = gold["label"].tolist()
     y_pred = ["literal"] * len(gold)
     return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
-
-
-# ── Row: Random (uniform over the 4 classes) ───────────────────────────────────
 
 def eval_random(gold: pd.DataFrame, trials: int = 200, seed: int = 42, ci: float = 0.95) -> dict:
     """Uniform random guessing among the 4 classes, averaged over many trials
@@ -120,9 +112,6 @@ def eval_random(gold: pd.DataFrame, trials: int = 200, seed: int = 42, ci: float
         out[f"{k}_ci_hi"] = round(float(np.percentile(per_trial[k], hi_pct)), 4)
     return out
 
-
-# ── Rows evaluated directly (checkpoint never trained on the gold pool) ────────
-
 def eval_direct(checkpoint: str, gold: pd.DataFrame) -> dict:
     model, tok = load_model(checkpoint)
     preds = predict_sentences(gold["text_cree"].tolist(), model, tok,
@@ -133,9 +122,6 @@ def eval_direct(checkpoint: str, gold: pd.DataFrame) -> dict:
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
     return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
-
-
-# ── Row: Full (+TLM+CLKD+SFT) — honest 5-fold CV ────────────────────────────────
 
 def eval_cv(model_id: str, gold: pd.DataFrame) -> dict | None:
     cv_folds_file = "data/figurative/cv_folds.parquet"
@@ -175,9 +161,6 @@ def eval_cv(model_id: str, gold: pd.DataFrame) -> dict | None:
     combined = pd.concat(all_preds, ignore_index=True)
     y_true, y_pred = combined["label"].tolist(), combined["pred"].tolist()
     return {**metrics_for(y_true, y_pred), **bootstrap_ci(y_true, y_pred)}
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
@@ -271,7 +254,6 @@ def main() -> None:
                   f"{r['f1_literal']:.3f} | {r['f1_idiom']:.3f} | {r['f1_metaphor']:.3f} | {r['f1_simile']:.3f} |")
     print(f"{'='*110}")
     print(f"\nFull metrics (incl. precision/recall) saved → {args.out}")
-
 
 if __name__ == "__main__":
     main()

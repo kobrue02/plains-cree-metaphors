@@ -53,7 +53,6 @@ CV_CONDITIONS = [
     ("mBERT (base pipeline)",       "mbert"),
     ("mDeBERTa-v3 (base pipeline)", "mdeberta"),
     ("mDistilBERT (base pipeline)", "mdistilbert"),
-    # ── contrastive alpha sweep (jobs/alpha_sweep.sh) ─────────────────────────
     # Production TLM (and "Ablation: full") trains at alpha=0.2 by default —
     # "Ablation: no InfoNCE" above is the true alpha=0.0 leave-one-out from
     # Full (same CLKD hyperparameters, only alpha differs); "Ablation:

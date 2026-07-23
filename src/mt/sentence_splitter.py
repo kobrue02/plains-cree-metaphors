@@ -62,7 +62,6 @@ class ParallelSentenceSplitter:
         print(f"Wrote {len(sent_df):,} sentence pairs → {path}")
         return path
 
-    # ── alignment helpers ─────────────────────────────────────────────────────
 
     @staticmethod
     def _score(

@@ -50,7 +50,6 @@ try:
 except ImportError:
     _wandb = None
 
-
 def _gold_metrics(model, tokenizer, gold_df: pd.DataFrame, batch_size: int, max_length: int) -> dict:
     """Macro/per-label F1 of `model` (in its current state) against the full
     gold set — CLKD never trains on gold or silver labels, so this is always
@@ -70,7 +69,6 @@ def _gold_metrics(model, tokenizer, gold_df: pd.DataFrame, batch_size: int, max_
         metrics[f"{name}_f1"] = report[name]["f1-score"]
     return metrics
 
-
 @dataclass
 class DistillConfig:
     # tlm-adapted xlm checkpoint (or figurative checkpoint for align/binary_kl)
@@ -80,12 +78,10 @@ class DistillConfig:
     # "align" | "binary_kl" | "clkd"
     mode:        str  = "clkd"
 
-    # ── CLKD-specific ─────────────────────────────────────────────────────────
     teacher_checkpoint: str | None = None  # required for mode="clkd"
     freeze_n_layers:    int        = 0     # freeze first n student transformer layers (0 = train all)
     num_labels:         int        = 4     # must match the teacher's num_labels
 
-    # ── Training ──────────────────────────────────────────────────────────────
     batch_size:    int   = 16
     epochs:        int   = 10
     learning_rate: float = 5e-6
@@ -93,16 +89,11 @@ class DistillConfig:
     temperature:   float = 2.0
     max_length:    int   = 256
 
-    # ── align / binary_kl only ────────────────────────────────────────────────
     freeze_head:   bool  = True
 
-    # ── Output ────────────────────────────────────────────────────────────────
     hub_model_id:  str | None = None
     output_dir:    str  = "data/figurative/distilled"
     wandb_project: str | None = None
-
-
-# ── Datasets ──────────────────────────────────────────────────────────────────
 
 class ParallelDataset(Dataset):
     """Single-tokenizer dataset for align / binary_kl modes."""
@@ -131,7 +122,6 @@ class ParallelDataset(Dataset):
             "en_input_ids":        e["input_ids"].squeeze(0),
             "en_attention_mask":   e["attention_mask"].squeeze(0),
         }
-
 
 class CLKDDataset(Dataset):
     """Dual-tokenizer dataset: teacher tokenizer for English, student tokenizer for Cree."""
@@ -168,12 +158,8 @@ class CLKDDataset(Dataset):
             "student_attention_mask": s["attention_mask"].squeeze(0),
         }
 
-
-# ── Loss functions ─────────────────────────────────────────────────────────────
-
 def _align_loss(h_cree: torch.Tensor, h_en: torch.Tensor) -> torch.Tensor:
     return 1.0 - F.cosine_similarity(h_cree, h_en, dim=-1).mean()
-
 
 def _binary_kl_loss(
     cree_logits: torch.Tensor,
@@ -190,7 +176,6 @@ def _binary_kl_loss(
     cree_log = torch.log(to_binary(cree_logits, 1.0) + 1e-8)
     return F.kl_div(cree_log, en_soft, reduction="batchmean")
 
-
 def _clkd_loss(
     teacher_logits: torch.Tensor,
     student_logits: torch.Tensor,
@@ -199,9 +184,6 @@ def _clkd_loss(
     teacher_probs     = F.softmax(teacher_logits / temperature, dim=-1)
     student_log_probs = F.log_softmax(student_logits, dim=-1)
     return F.kl_div(student_log_probs, teacher_probs, reduction="batchmean")
-
-
-# ── Layer freezing ─────────────────────────────────────────────────────────────
 
 def _freeze_n_layers(model, n: int) -> None:
     """Freeze embeddings and the first n transformer layers; works across XLM, XLM-R, and DeBERTa by matching the first integer path segment."""
@@ -215,16 +197,10 @@ def _freeze_n_layers(model, n: int) -> None:
     trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"[distill] frozen first {n} layers — trainable params: {trainable:,}")
 
-
-# ── Main entry point ───────────────────────────────────────────────────────────
-
 def distill(config: DistillConfig) -> str:
     if config.mode == "clkd":
         return _distill_clkd(config)
     return _distill_self(config)
-
-
-# ── CLKD ──────────────────────────────────────────────────────────────────────
 
 def _distill_clkd(config: DistillConfig) -> str:
     if not config.teacher_checkpoint:
@@ -418,9 +394,6 @@ def _distill_clkd(config: DistillConfig) -> str:
         _wandb.finish()
 
     return config.output_dir
-
-
-# ── Self-distillation (align / binary_kl) ─────────────────────────────────────
 
 def _distill_self(config: DistillConfig) -> str:
     os.makedirs(config.output_dir, exist_ok=True)
