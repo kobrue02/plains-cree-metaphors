@@ -55,6 +55,7 @@ def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
 
     path = "data/bloomfield_texts_annotated.parquet"
     if df is None:
+        # resume from a previous partial run if one was saved, rather than re-annotating from scratch
         src = path if os.path.exists(path) else "data/bloomfield_texts.parquet"
         df  = pd.read_parquet(src)
     for col in ("annotation", "reasoning"):
@@ -70,6 +71,7 @@ def annotate(df: pd.DataFrame | None = None) -> pd.DataFrame:
             df.at[i, "annotation"] = label
             df.at[i, "reasoning"]  = reasoning
         except (Exception, KeyboardInterrupt) as e:
+            # break (not raise) so the partial results saved below still get written to disk
             tqdm.write(f"Error at paragraph {i}: {e}")
             break
     df.to_parquet(path, index=False)
@@ -101,6 +103,7 @@ def fine_tune(
     else:
         df      = pd.read_parquet("data/bloomfield_texts.parquet")
         sent_df = ParallelSentenceSplitter(df).split()
+        # confidence filtering only applies when re-splitting here; a pre-built sentences_file is used as-is
         if confidence > 0:
             sent_df = sent_df[sent_df.confidence >= confidence]
             print(f"Kept {len(sent_df):,} pairs with confidence ≥ {confidence}")

@@ -92,24 +92,20 @@ def main() -> None:
 
     dfs: list[pd.DataFrame] = []
 
-    # Bloomfield 1934
     dfs.append(build_bloomfield_df(skip_scrape=args.skip_bloomfield_scrape))
 
-    # EdTeKLA
     if not args.skip_edtekla:
         dfs.append(build_edtekla_df())
     else:
         print("EdTeKLA: skipped (--skip-edtekla)")
         dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
 
-    # Ojibwe
     if not args.skip_ojibwe:
         dfs.append(build_ojibwe_df())
     else:
         print("Ojibwe: skipped (--skip-ojibwe)")
         dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
 
-    # Okimasis
     if not args.skip_okimasis:
         if os.path.exists(OKIMASIS_PDF):
             from src.parsers.okimasis import extract
@@ -126,7 +122,6 @@ def main() -> None:
         print("Okimāsis: skipped (--skip-okimasis)")
         dfs.append(pd.DataFrame(columns=["text_cree", "text_en", "source"]))
 
-    # Bloomfield 1930
     pairs_1930: list[tuple[str, str]] = []
     if not args.skip_bloomfield_1930:
         if os.path.exists(BLOOMFIELD_1930_TXT):

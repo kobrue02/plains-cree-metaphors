@@ -38,7 +38,7 @@ class FigurativeConfig:
 # ── Named presets ─────────────────────────────────────────────────────────────
 
 def tlm_base() -> FigurativeConfig:
-    """TLM-adapted XLM-R base fine-tuned on VUA20+MAGPIE."""
+    """TLM-adapted XLM-R base fine-tuned on VUA20+MAGPIE+FLUTE."""
     return FigurativeConfig(
         encoder="KonradBRG/xlm-r-plains-cree-en-tlm",
         experiment_name="tlm_base_figurative",
@@ -48,7 +48,7 @@ def tlm_base() -> FigurativeConfig:
 
 
 def tlm_large() -> FigurativeConfig:
-    """TLM-adapted XLM-R large fine-tuned on VUA20+MAGPIE."""
+    """TLM-adapted XLM-R large fine-tuned on VUA20+MAGPIE+FLUTE."""
     return FigurativeConfig(
         encoder="KonradBRG/xlm-r-large-plains-cree-en-tlm",
         batch_size=16,
@@ -60,7 +60,7 @@ def tlm_large() -> FigurativeConfig:
 
 
 def tlm_xlm() -> FigurativeConfig:
-    """XLM-MLM-100-1280 TLM-adapted encoder fine-tuned on VUA20+MAGPIE."""
+    """XLM-MLM-100-1280 TLM-adapted encoder fine-tuned on VUA20+MAGPIE+FLUTE."""
     return FigurativeConfig(
         encoder="KonradBRG/xlm-mlm-100-1280-plains-cree-en-tlm",
         batch_size=16,

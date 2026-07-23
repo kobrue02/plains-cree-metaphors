@@ -1,7 +1,6 @@
 """
-Fine-tune a sequence classifier on the combined VUA20 + MAGPIE 3-class task.
-
-Labels: 0=literal, 1=idiom, 2=metaphor
+Fine-tune a sequence classifier on the VUA20+MAGPIE+FLUTE sentence-level task
+(see src.figurative.data for the label scheme).
 """
 
 from __future__ import annotations

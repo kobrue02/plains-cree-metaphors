@@ -49,8 +49,7 @@ def hub_id(prefix: str, model_id: str, stage: str) -> str:
 
 
 def publish(repo_id: str, stage: str, base_model: str, **stage_kwargs) -> None:
-    """Push a model card and add the checkpoint to its Hub collection.
-    Called right after a stage pushes weights, so cards/collections stay current
+    """Called right after a stage pushes weights, so cards/collections stay current
     without a manual step. Best-effort — must not fail an otherwise-successful job."""
     push_card_for(repo_id, stage, base_model, **stage_kwargs)
     add_model_to_collection(repo_id, stage)

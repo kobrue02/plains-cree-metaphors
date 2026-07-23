@@ -6,14 +6,6 @@ The book is a facing-page dual-language edition: even pages = Ojibwe text
 The Internet Archive djvu OCR dump alternates pages in sequence, so Ojibwe
 and English paragraphs interleave in the file.
 
-Strategy
---------
-1. Split the raw text into blank-line-delimited blocks.
-2. Classify each block as ojibwe / english / header / meta / footnote.
-3. Pull story headers out as section boundaries.
-4. Within each story, collect Ojibwe and English paragraphs into two lists.
-5. Zip the two lists → aligned paragraph pairs.
-
 Output: CSV with columns  story, para_idx, text_ojibwe, text_en
 """
 
@@ -69,7 +61,7 @@ def _english_score(text: str) -> int:
 
 def classify_block(raw: str) -> str:
     """Return 'ojibwe' | 'english' | 'header' | 'meta' | 'footnote'."""
-    text = " ".join(raw.split())  # collapse whitespace for pattern matching
+    text = " ".join(raw.split())
     if not text:
         return "meta"
 

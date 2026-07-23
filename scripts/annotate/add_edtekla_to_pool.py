@@ -58,6 +58,7 @@ def add_to_pool(
     known = set(pool["text_cree"].dropna().str.strip().tolist())
     print(f"Pool: {len(pool):,} existing sentences")
 
+    # Exclude sentences already in the gold set so silver never re-adds/re-annotates them
     if os.path.exists(GOLD_FILE):
         gold = pd.read_parquet(GOLD_FILE)
         known |= set(gold["text_cree"].dropna().str.strip().tolist())

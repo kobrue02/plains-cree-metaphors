@@ -1,15 +1,12 @@
 """
-Split Bloomfield (1930) paragraph pairs into Cree sentences and append to
-the active annotation pool (data/bloomfield_texts_sentences.parquet).
+Split Bloomfield (1930) "Sacred Stories" paragraph pairs into Cree sentences
+and append to the active annotation pool
+(data/bloomfield_texts_sentences.parquet).
 
-The 1930 "Sacred Stories" corpus contains oral narrative — trickster tales and
-sacred stories — which are figurative-language-rich compared to the 1934
-interlinear gloss corpus. Adding these sentences extends the pool with data
-that is more likely to yield idiom/metaphor/simile instances.
-
-Sentence splitting uses `. ` as a boundary; minimum length and alpha-ratio
-filters remove OCR noise. The English paragraph is kept as a loose reference
-gloss for all sentences extracted from it.
+This oral-narrative corpus (trickster tales, sacred stories) is more
+figurative-language-rich than the 1934 interlinear gloss corpus, so it's
+worth extending the pool with. Each extracted sentence keeps the whole source
+paragraph's English text as a loose (non-aligned) reference gloss.
 
 Usage:
   python scripts/add_bloomfield_1930_to_pool.py
@@ -27,7 +24,6 @@ SRC_FILE  = "data/sentences_bloomfield_1930.txt"
 POOL_FILE = "data/bloomfield_texts_sentences.parquet"
 SOURCE_ID = "bloomfield_1930"
 
-# Minimum characters for a Cree sentence to be kept
 _MIN_LEN   = 20
 # Minimum ratio of alphabetic characters (filters OCR garbage)
 _MIN_ALPHA = 0.45
@@ -41,21 +37,14 @@ _EN_WORDS = frozenset({
 
 
 def split_cree_sentences(para: str) -> list[str]:
-    """
-    Split a Cree paragraph into individual sentences.
-
-    Bloomfield 1930 uses `.` to end sentences (same as modern SRO). We split
-    on `. ` (period + space) and also on period-at-end. Each fragment is
-    stripped and filtered for minimum quality.
-    """
-    # Normalise whitespace first
+    """Bloomfield 1930 uses `.` to end sentences (same as modern SRO), so
+    splitting on `. ` is safe here."""
     para = re.sub(r"\s+", " ", para).strip()
-    # Split on period followed by space or end-of-string
     parts = re.split(r"\.\s+", para)
     sentences = []
     for part in parts:
         part = part.strip().strip('"').strip("'").strip()
-        # Re-add the period (split consumed it) unless part already ends with punct
+        # Split consumed the period; restore it unless punctuation is already there
         if part and not part[-1] in ".?!":
             part = part + "."
         if _keep(part):
@@ -96,16 +85,8 @@ def add_to_pool(
 ) -> int:
     """Add Bloomfield 1930 sentences to the annotation pool. Returns count of new sentences.
 
-    Parameters
-    ----------
-    src:
-        Either a file path to a Cree ||| English text file, or a list of
-        (cree, english) tuples returned directly by bloomfield_1930.extract().
-    pool_path:
-        Path to the parquet pool file to append to.
-    dry_run:
-        If True, report what would be added without writing.
-    """
+    `src` may be a file path or an in-memory list of (cree, english) pairs
+    (e.g. from bloomfield_1930.extract())."""
     if isinstance(src, str):
         if not os.path.exists(src):
             print(f"  [skip] {src} not found")
@@ -124,6 +105,7 @@ def add_to_pool(
     known = set(pool["text_cree"].dropna().str.strip().tolist())
     print(f"Pool: {len(pool):,} existing sentences")
 
+    # Exclude sentences already in the gold set so silver never re-adds/re-annotates them
     gold_file = "data/figurative/bloomfield_annotated.parquet"
     if os.path.exists(gold_file):
         gold = pd.read_parquet(gold_file)
@@ -161,6 +143,7 @@ def add_to_pool(
     new_df = pd.DataFrame(new_rows)
     merged = pd.concat([pool, new_df], ignore_index=True)
 
+    # Older pool snapshots predate the source_file column; backfill existing rows
     if "source_file" not in pool.columns:
         merged.loc[merged.index < len(pool), "source_file"] = "bloomfield_1934"
 

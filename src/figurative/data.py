@@ -124,8 +124,6 @@ def _load_magpie() -> tuple[list[dict], list[dict]]:
 # ── dataset ───────────────────────────────────────────────────────────────────
 
 class FigurativeDataset(Dataset):
-    """Sentence-level 3-class dataset tokenised for sequence classification."""
-
     def __init__(
         self,
         records: list[dict],

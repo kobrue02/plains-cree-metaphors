@@ -16,13 +16,6 @@ scripts/annotate/deepseek_label_pool.py).
 Where a sentence appears in both (the silver pass doesn't know about gold
 footnoted sentences and re-annotates them too), the gold label wins.
 
-Reports, for gold-only / silver-only / combined-final:
-  - label distribution (literal / idiom / metaphor / simile)
-  - source distribution (gold vs silver; underlying manuscript
-    bloomfield_1934 vs bloomfield_1930)
-  - average sentence length (words), Cree and English
-  - vocabulary size (unique word types), Cree and English
-
 Usage:
   python scripts/viz/final_dataset_stats.py
   python scripts/viz/final_dataset_stats.py --gold-footnoted-only   # 219-row gold subset instead of all 1,225

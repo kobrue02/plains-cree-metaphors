@@ -1,17 +1,15 @@
 """
 Label the sentence pool with a trained classifier only (no DeepSeek involved).
 
-Runs the same pool filtering as deepseek_label_pool.py (excluding the 1930
-manuscript by default) so the two label sets line up 1:1 for
-scripts/annotate/agreement_eval.py. That alignment isn't automatic though:
-deepseek_label_pool.py additionally excludes gold-labeled sentences (via its
-own --gold-file), which this script doesn't do on its own, and the
-underlying sentence pool can drift between when a silver-labeling run
-happened and whenever this is run (corrections, outage cleanups, etc.) —
-both cause the two label sets to disagree on which sentences even exist,
-which showed up once already as ~2,000 sentences dropped from a merge. Use
---restrict-to to guarantee exact 1:1 alignment against a specific silver
-label file instead of relying on the current pool matching it by chance.
+Runs the same pool filtering as deepseek_label_pool.py so the two label sets
+line up 1:1 for agreement_eval.py — but that alignment isn't automatic:
+deepseek_label_pool.py additionally excludes gold-labeled sentences, and the
+underlying pool can drift between when a silver run happened and whenever
+this runs (corrections, outage cleanups). Either can make the two label sets
+disagree on which sentences even exist — this has already dropped ~2,000
+sentences from a merge once. Use --restrict-to to force exact 1:1 alignment
+against a specific silver label file instead of relying on the pool matching
+it by chance.
 
 Usage:
   python scripts/annotate/predict_pool.py --checkpoint KonradBRG/xlm-mlm-plains-cree-en-figurative

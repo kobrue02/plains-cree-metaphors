@@ -50,8 +50,6 @@ def build_gold() -> pd.DataFrame:
 
 
 def build_silver(gold: pd.DataFrame) -> pd.DataFrame:
-    # Every non-gold Cree sentence (Bloomfield 1934/1930 + EdTeKLA) is labeled by
-    # the same dictionary-grounded LLM procedure.
     silver = pd.read_parquet(SILVER_FILE)[
         ["paragraph_id", "sentence_id", "text_cree", "text_en", "deepseek_label", "reasoning"]
     ].rename(columns={"deepseek_label": "label", "reasoning": "rationale"})

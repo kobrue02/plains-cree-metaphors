@@ -86,11 +86,10 @@ def main() -> None:
     device = get_device()
     print(f"Device: {device}")
 
-    # Load and split data — use a fixed held-out split so results are comparable
     df = pd.read_parquet(args.sentences_file)
     df = df.dropna(subset=["text_cree", "text_en"])
     df = df.sample(frac=1, random_state=args.seed).reset_index(drop=True)
-    eval_df = df.tail(args.n)  # last N rows after shuffle = held-out
+    eval_df = df.tail(args.n)  # seeded shuffle makes this a fixed, reproducible held-out slice
     cree = eval_df["text_cree"].astype(str).tolist()
     en   = eval_df["text_en"].astype(str).tolist()
     print(f"Evaluating on {len(cree)} held-out pairs from {args.sentences_file}")

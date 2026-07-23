@@ -44,19 +44,16 @@ LABEL_MAP = {
 @dataclass
 class CalibrateConfig:
     """
-    Held-out policy: outside CV mode (holdout_fold=None), the 219
-    footnote-verified sentences in GOLD_FILE are the fixed evaluation set for
-    every run, regardless of what annot_file trains on (gold, silver, or
-    anything else) — they are always excluded from training and are the only
-    thing calibrate() reports eval metrics against. eval_file lets you point
-    at a different file for eval instead (rare — e.g. a smoke test); it does
-    NOT change what gets excluded from training, which is always GOLD_FILE's
-    footnoted sentences.
+    Held-out policy: outside CV mode (holdout_fold=None), GOLD_FILE's 219
+    footnote-verified sentences are always excluded from training and are the
+    only set calibrate() reports eval metrics against, regardless of what
+    annot_file trains on. eval_file only redirects eval to a different file
+    (rare, e.g. a smoke test) — it never changes what's excluded from training.
 
     In CV mode (holdout_fold set) this doesn't apply: that's a separate,
     already-honest k-fold rotation (see scripts/data/build_cv_folds.py /
-    scripts/evals/eval_cv.py) where every sentence is trained on in 4/5 folds
-    and scored only in the fold where it's held out.
+    scripts/evals/eval_cv.py) where every sentence trains in 4/5 folds and is
+    scored only in the fold where it's held out.
     """
     checkpoint:   str            # CLKD model to start from
     annot_file:   str  = "data/figurative/bloomfield_annotated.parquet"
@@ -161,17 +158,11 @@ def _load_eval_records(eval_file: str) -> list[dict]:
 
 
 def _save_metrics(config: CalibrateConfig, metrics: dict) -> None:
-    """Persist the final (best-checkpoint) eval — calibrate() has always
-    computed this every epoch (it's what early stopping/best-checkpoint
-    selection uses), but never saved the final number anywhere durable, so it
-    only ever existed in wandb (if logged) or was lost once the job finished.
-    One row per hub_model_id (falling back to checkpoint+output_dir if no hub
-    id was given); reruns overwrite their own row. Skipped for CV-mode runs
-    (config.holdout_fold is not None) — that in-training eval is only a proxy
-    split for early stopping, not the honest number (see
-    scripts/evals/eval_cv.py for that). For non-CV/production runs this is
-    also just a proxy split of the gold data being trained on, not a genuinely
-    held-out test — see the note in calibrate()'s eval_recs branch."""
+    """Persist the final eval so it isn't lost to wandb (or nowhere) once the
+    job ends — one row per hub_model_id, reruns overwrite their own row.
+    Skipped in CV mode; even in production mode this is a proxy split of the
+    gold data being trained on, not the honest held-out number — see
+    scripts/evals/eval_cv.py for that."""
     key = config.hub_model_id or f"{config.checkpoint}->{config.output_dir}"
     row = {
         "key":           key,
@@ -204,13 +195,10 @@ def calibrate(config: CalibrateConfig) -> str:
     if config.eval_file is not None:
         eval_recs = _load_eval_records(config.eval_file)
     else:
-        # Both CV and non-CV modes: this in-training eval is only a proxy for
-        # early stopping/checkpoint selection, not the reported number — the
-        # honest, held-out score comes from scripts/evals/eval_cv.py (CV mode,
-        # predicting on the fold this run excluded) or is otherwise understood
-        # to be in-sample (non-CV/production mode, see
-        # figurative_results_table.py's own note on why it uses the CV
-        # aggregate instead of this checkpoint's own eval for the Full row).
+        # Proxy split only, not the reported number — the honest held-out
+        # score comes from scripts/evals/eval_cv.py (CV mode) or
+        # figurative_results_table.py's CV aggregate (production mode, see
+        # its note on the Full row).
         train_recs, eval_recs = train_test_split(
             train_recs,
             test_size=0.2,

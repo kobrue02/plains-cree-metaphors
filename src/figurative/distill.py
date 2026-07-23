@@ -219,7 +219,6 @@ def _freeze_n_layers(model, n: int) -> None:
 # ── Main entry point ───────────────────────────────────────────────────────────
 
 def distill(config: DistillConfig) -> str:
-    """Run cross-lingual adaptation and return the output directory."""
     if config.mode == "clkd":
         return _distill_clkd(config)
     return _distill_self(config)

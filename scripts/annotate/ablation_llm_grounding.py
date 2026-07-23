@@ -2,23 +2,17 @@
 Ablation: how much does dictionary grounding — and translation itself —
 contribute to the LLM figurative-language annotation procedure (Section 3.3)?
 
-Three conditions, all scored against the same 228 footnote-verified gold
-sentences used everywhere else in the paper:
+Three conditions, scored against the same 228 gold sentences used elsewhere:
+  full              Cree + gloss + itwewina dictionary entries — the actual
+                     silver-annotation procedure. Reuses the cached
+                     deepseek_on_gold.parquet run; no new API calls.
+  no_dict           Cree + gloss, no dictionary entries.
+  no_dict_no_gloss  Cree sentence only. Tests whether the model can do this
+                     from pretraining exposure to Cree alone.
 
-  full              Cree + English gloss + itwewina dictionary entries.
-                     This is the actual silver-annotation procedure
-                     (scripts/annotate/deepseek_label_pool.py). No new API
-                     calls: its scores are pulled directly from the already-
-                     cached deepseek_on_gold.parquet run.
-  no_dict           Cree + English gloss, no dictionary entries.
-  no_dict_no_gloss  Cree sentence ONLY — no gloss, no dictionary. Tests
-                     whether the model can do this from pretraining exposure
-                     to Cree alone.
-
-The two new conditions get their own adapted system prompt (so the model
-isn't told it has evidence it wasn't actually given) but the same three-line
-LABEL/EXPRESSION/MEANING output format as the main procedure, so parsing and
-scoring are directly comparable. Each has its own resume-safe JSONL cache.
+The two new conditions use their own adapted system prompt (so the model
+isn't told it has evidence it wasn't actually given), each with its own
+resume-safe JSONL cache.
 
 Usage:
   python scripts/annotate/ablation_llm_grounding.py
@@ -192,7 +186,7 @@ def make_nvidia_call_fn(model_id: str, reasoning: bool):
             except Exception as exc:
                 last_exc = exc
                 if "429" in str(exc) and attempt < retries:
-                    time.sleep(2 ** attempt * 2)  # 2s, 4s, 8s, 16s
+                    time.sleep(2 ** attempt * 2)
         raise last_exc
     return _call
 

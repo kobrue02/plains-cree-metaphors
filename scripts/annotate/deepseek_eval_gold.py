@@ -1,22 +1,17 @@
 """
 Score the DeepSeek dictionary-grounded labeling procedure directly against
-Bloomfield's gold labels — i.e. treat DeepSeek itself as a classifier and ask
-how well it does, rather than only comparing it against our own model's
-predictions (see deepseek_agreement_eval.py for that separate question).
+Bloomfield's gold labels, treating DeepSeek itself as a classifier (see
+deepseek_agreement_eval.py for DeepSeek-vs-our-model instead).
 
-This never touches label/rationale/footnote_en: the annotation call only ever
-sees text_cree/text_en (same _annotate_one() used in deepseek_label_pool.py on
-the silver pool), so there is no leakage of Bloomfield's justification into
-the prompt.
+The annotation call only ever sees text_cree/text_en (same _annotate_one() as
+on the silver pool) — never label/rationale/footnote_en — so there's no
+leakage of Bloomfield's own justification into the prompt.
 
-By default this scores only the 219 footnote-verified sentences (the same
-fixed held-out set src/figurative/calibrate.py evaluates against) — pass
---include-unfootnoted to score against the full 1,225-row file instead.
-
-Runs DeepSeek by default. Pass --nvidia-model <model-id> to run a different
-model hosted on NVIDIA's endpoint (https://integrate.api.nvidia.com) against
-the exact same procedure instead — see src/annotate/llm.py. Needs
-NVIDIA_API_KEY set (env var or .env).
+By default scores only the 219 footnote-verified sentences (the same
+held-out set src/figurative/calibrate.py evaluates against); pass
+--include-unfootnoted to score the full file instead. --nvidia-model runs a
+different NVIDIA-hosted model (needs NVIDIA_API_KEY) through the same
+procedure — see src/annotate/llm.py.
 
 Usage:
   python scripts/annotate/deepseek_eval_gold.py

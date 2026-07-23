@@ -42,13 +42,11 @@ FIGURATIVE_LABELS    = ["literal", "idiom", "metaphor", "simile"]
 
 
 def eval_results_for(experiment_name: str, dataset_name: str = "VUA20 + MAGPIE + FLUTE") -> list[EvalResult] | None:
-    """Pull this run's real macro/per-label F1 from english_finetune_results.parquet
-    (see src/figurative/train.py's _save_metrics) and turn them into HF
-    EvalResult entries — these render as the "Evaluation results" widget on the
-    Hub page, the same mechanism trainer.push_to_hub() uses for its own
-    auto-generated card. Returns None (loudly, never silently) if the run
-    isn't in the file yet, so a missing-metrics card is an obvious warning in
-    the log, not a card that silently loses its whole Results section."""
+    """Pull this run's F1 scores from english_finetune_results.parquet (written by
+    src/figurative/train.py's _save_metrics) into HF EvalResult entries, which render
+    as the Hub page's "Evaluation results" widget. Returns None (never silently) if
+    the run isn't in the file yet, so a missing-metrics card logs an obvious warning
+    instead of quietly losing its whole Results section."""
     if not os.path.exists(ENGLISH_RESULTS_FILE):
         print(f"[cards] WARNING: {ENGLISH_RESULTS_FILE} not found — "
               f"'{experiment_name}' card will be pushed WITHOUT a Results section")
@@ -100,8 +98,6 @@ STAGE_PIPELINE_TAG = {
     "calibrated": "text-classification",
 }
 
-
-# ── Stage-templated card text ──────────────────────────────────────────────────
 
 def render_stage_card(stage: str, base_model: str, **kw) -> tuple[str, str]:
     """Return (summary, details-markdown) for a pipeline-produced checkpoint.
@@ -205,8 +201,6 @@ Final deployed checkpoint for figurative language detection in Plains Cree.
 
     raise ValueError(f"No card template for stage '{stage}'")
 
-
-# ── Model definitions ─────────────────────────────────────────────────────────
 
 MODELS = [
 
@@ -458,8 +452,6 @@ Classifier head trained on VUA20 + MAGPIE + FLUTE (English only).
 ]
 
 
-# ── Card template ─────────────────────────────────────────────────────────────
-
 def make_card(m: dict) -> ModelCard:
     language = m.get("language", LANGUAGE)
     stage    = m.get("stage")
@@ -516,9 +508,9 @@ Evaluated on a held-out split of {eval_results[0].dataset_name}.
 
 
 def push_card_for(repo_id: str, stage: str, base_model: str, **stage_kwargs) -> None:
-    """Build and push a card for a single Hub repo. Called by pipeline.py right
-    after it pushes a checkpoint, so cards stay current without a manual step.
-    Never raises — a card push failing should not fail an otherwise-successful job."""
+    """Called by pipeline.py right after it pushes a checkpoint, so cards stay
+    current without a manual step. Never raises — a failure here shouldn't fail
+    an otherwise-successful job."""
     api = HfApi()
     try:
         api.repo_info(repo_id=repo_id, repo_type="model")
@@ -528,8 +520,6 @@ def push_card_for(repo_id: str, stage: str, base_model: str, **stage_kwargs) -> 
     except Exception as exc:
         print(f"[hub] card push failed for {repo_id} — {exc}")
 
-
-# ── Push ──────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -544,7 +534,6 @@ if __name__ == "__main__":
     for m in models:
         repo = m["repo_id"]
         try:
-            # Check repo exists before pushing
             api.repo_info(repo_id=repo, repo_type="model")
             card = make_card(m)
             card.push_to_hub(repo)

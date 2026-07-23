@@ -1,14 +1,12 @@
 """
 Label the sentence pool with DeepSeek only (no model involved).
 
-For every Cree sentence in the pool (excluding the 1930 manuscript by default,
-and always excluding sentences that already have a gold, footnote-verified
-label — see scripts/annotate/annotate_bloomfield.py), DeepSeek is given the
-Cree sentence, its English gloss, and itwêwina dictionary entries for each
-content word, and asked to classify it as literal / idiom / metaphor / simile
-— purely from that evidence, with no model prediction passed in. The model's
-reasoning chain (reasoning_content) is kept alongside the label in a
-"reasoning" field, for auditing why a given label was chosen.
+For every Cree sentence in the pool (excluding the 1930 manuscript by
+default), DeepSeek is given the Cree sentence, its English gloss, and
+itwêwina dictionary entries for each content word, and classifies it as
+literal / idiom / metaphor / simile from that evidence alone. The reasoning
+chain is kept alongside the label in a "reasoning" field, for auditing why a
+given label was chosen.
 
 Gold and silver are meant to be disjoint (silver = "the un-footnoted majority
 of the corpus" per the writeup) — gold sentences are excluded here so silver
@@ -17,7 +15,7 @@ never re-annotates something that already has a better-grounded label.
 Resume-safe: labels (and reasoning) are checkpointed to a JSONL cache as they
 come in, so an interrupted run picks up where it left off.
 
-Run this on its own, then scripts/annotate/predict_pool.py on its own, then
+Run this on its own, then scripts/annotate/predict_pool.py, then
 scripts/annotate/agreement_eval.py to compare the two.
 
 Usage:

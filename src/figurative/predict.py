@@ -51,7 +51,6 @@ def predict_sentences(
     batch_size: int = 32,
     max_length: int = 128,
 ) -> list[dict]:
-    """Run inference on a list of sentences. Returns one dict per sentence."""
     device = next(model.parameters()).device
     results = []
 

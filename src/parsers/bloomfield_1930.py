@@ -20,7 +20,6 @@ Usage:
 from __future__ import annotations
 import argparse, re, sys, os
 
-# common english function words used to classify paragraphs as english
 _EN_WORDS = frozenset({
     "the", "he", "she", "was", "had", "his", "her", "and", "then", "to", "of",
     "that", "this", "it", "in", "for", "on", "at", "by", "with", "as", "said",
