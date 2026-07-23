@@ -166,6 +166,7 @@ def train_on_silver(config: SilverSFTConfig) -> str:
         metric_for_best_model="macro_f1",
         greater_is_better=True,
         logging_steps=10,
+        run_name=os.path.basename(config.output_dir.rstrip("/")) if config.wandb_project else None,
         report_to="wandb" if config.wandb_project else "none",
         **get_trainer_device_kwargs(),
         **get_precision_kwargs(),

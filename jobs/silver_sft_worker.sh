@@ -50,4 +50,5 @@ python scripts/train/train_silver.py \
     --epochs 10 \
     --batch-size 16 \
     --freeze-n-layers "$N" \
-    --hierarchical
+    --hierarchical \
+    --wandb-project fnlp-silver-sft
