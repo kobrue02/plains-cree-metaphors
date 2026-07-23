@@ -25,6 +25,25 @@
 set -euo pipefail
 N="$1"
 
+PROJECT_ROOT=/home/tu/tu_tu/tu_zxoqp65/work/plains-cree-metaphors
+
+module load devel/cuda/12.8
+module load devel/python/3.13.3-llvm-19.1
+echo "CUDA: $CUDA_HOME"
+
+export CUDA_VISIBLE_DEVICES=0
+export TORCH_EXTENSIONS_DIR=$PROJECT_ROOT/.cache/torch_extensions
+export HF_HOME=$PROJECT_ROOT/.cache/huggingface
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export TOKENIZERS_PARALLELISM=false
+export PYTHONUNBUFFERED=1
+mkdir -p $TORCH_EXTENSIONS_DIR $HF_HOME
+
+source $PROJECT_ROOT/.venv/bin/activate
+cd $PROJECT_ROOT
+uv sync
+mkdir -p logs
+
 python scripts/train/train_silver.py \
     --checkpoint KonradBRG/xlm-mlm-plains-cree-en-tlm \
     --output-dir "data/figurative/silver_sft_sweep/n${N}" \
