@@ -17,6 +17,7 @@ wheels/
 *.png
 *.tex
 *.parquet
+*.txt
 *.jsonl
 *.md
 *.pdf
