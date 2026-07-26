@@ -1,7 +1,7 @@
 # Figurative Language Corpus Construction in Plains Cree
 
-The first figurative-language corpus for **Plains Cree (nêhiyawêwin)** — literal /
-idiom / metaphor / simile — built by treating Leonard Bloomfield's 1930s documentary
+The first figurative-language corpus for **Plains Cree (nêhiyawêwin)** containing literals /
+idioms / metaphors / similes, built by treating Leonard Bloomfield's 1930s documentary
 commentary as gold evidence and scaling it with a dictionary-grounded LLM annotation
 procedure. Two independent methods for producing a Cree figurative-language classifier are
 compared: cross-lingual distillation from an English teacher (no Cree labels at all), and
